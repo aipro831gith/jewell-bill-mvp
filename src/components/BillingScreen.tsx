@@ -23,9 +23,10 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   const [invoiceId, setInvoiceId] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(() => {
     const local = new Date();
-    const offset = local.getTimezoneOffset();
-    const adjusted = new Date(local.getTime(), -offset * 60 * 1000);
-    return adjusted.toISOString().split('T')[0];
+    const yyyy = local.getFullYear();
+    const mm = String(local.getMonth() + 1).padStart(2, '0');
+    const dd = String(local.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   });
   
   // Customer details

@@ -84,16 +84,16 @@ export const ProfileSelection: React.FC<ProfileSelectionProps> = ({
                       {firstLetter}
                     </span>
                   )}
-                  
-                  {/* Delete Hover Action */}
-                  <button
-                    onClick={(e) => profile.id !== undefined && handleDeleteClick(profile.id, profile.brandName, e)}
-                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition duration-200 text-red-400 hover:text-red-300 rounded-full"
-                    title="Delete Brand Profile"
-                  >
-                    <Trash2 className="h-6 w-6 transform scale-75 group-hover:scale-100 transition" />
-                  </button>
                 </div>
+
+                {/* Delete Hover Badge (Top Right of Avatar) */}
+                <button
+                  onClick={(e) => profile.id !== undefined && handleDeleteClick(profile.id, profile.brandName, e)}
+                  className="absolute top-0 right-4 sm:right-5 bg-red-650 hover:bg-red-700 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition duration-200 z-10 hover:scale-110"
+                  title="Delete Brand Profile"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
 
                 {/* Brand Details */}
                 <span className="mt-4 text-sm font-bold text-zinc-400 group-hover:text-white transition uppercase tracking-wide truncate max-w-full font-outfit">
