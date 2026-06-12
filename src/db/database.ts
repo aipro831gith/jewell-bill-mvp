@@ -86,6 +86,7 @@ export interface Invoice {
   grandTotal: number;
   payableAmount: number;
   paymentMode: 'Cash' | 'Card' | 'Bank Transfer' | 'UPI' | 'RTGS' | 'None';
+  isSwappedAddress?: boolean;
 }
 
 interface JewellBillDBSchema extends DBSchema {

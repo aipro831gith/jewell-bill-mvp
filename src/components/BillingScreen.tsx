@@ -28,6 +28,42 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
     const dd = String(local.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSwappedAddress, setIsSwappedAddress] = useState(false);
+
+  const handleReset = async () => {
+    setCustomerDetails({
+      partyName: '',
+      phonePrefix: '+91',
+      phone: '',
+      address: '',
+      city: '',
+      stateName: '',
+      stateCode: '',
+      idType: 'PAN',
+      panAadhaar: '',
+      placeOfSupply: ''
+    });
+    setCustomerSearchQuery('');
+    setItems([]);
+    setDiscountApplied(0);
+    setPaymentMode('None');
+    setCustomPayableAmount(null);
+    setIsSwappedAddress(false);
+    
+    const num = await getNextInvoiceNumber(
+      type === 'TAX_INVOICE' ? profile.taxInvoicePrefix : profile.challanPrefix,
+      type
+    );
+    setInvoiceId(num);
+    
+    const local = new Date();
+    const yyyy = local.getFullYear();
+    const mm = String(local.getMonth() + 1).padStart(2, '0');
+    const dd = String(local.getDate()).padStart(2, '0');
+    setInvoiceDate(`${yyyy}-${mm}-${dd}`);
+    setIsSaved(false);
+  };
   
   // Customer details
   const [customerDetails, setCustomerDetails] = useState({
@@ -294,12 +330,13 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         discountApplied: discountApplied,
         grandTotal: finalGrandTotal,
         payableAmount: currentPayableAmount,
-        paymentMode: paymentMode
+        paymentMode: paymentMode,
+        isSwappedAddress: isSwappedAddress
       };
 
       await saveInvoice(newInvoice);
       await generateAndDownloadPDF(newInvoice, profile);
-      onSaveSuccess();
+      setIsSaved(true);
     } catch (err) {
       console.error(err);
       alert('Error occurred while generating PDF.');
@@ -307,6 +344,67 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       setGeneratingPDF(false);
     }
   };
+
+  if (isSaved) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 px-4 text-center">
+        <div className="glass p-8 rounded-2xl border border-indigo-500/20 shadow-2xl flex flex-col items-center">
+          <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-6 animate-bounce">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          
+          <h1 className="text-2xl font-bold text-white mb-2 font-outfit">Document Saved Successfully!</h1>
+          <p className="text-zinc-400 text-sm mb-8">
+            Your {type === 'TAX_INVOICE' ? 'Tax Invoice' : 'Delivery Challan'} has been registered in IndexedDB and the PDF has been compiled for preview & download.
+          </p>
+          
+          {/* Summary Details */}
+          <div className="w-full bg-zinc-950/40 border border-zinc-850 rounded-xl p-4 mb-8 text-left space-y-3.5 text-xs text-zinc-400">
+            <div className="flex justify-between">
+              <span>Document Number:</span>
+              <strong className="text-white font-mono">{invoiceId}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span>Document Type:</span>
+              <strong className="text-zinc-200">{type === 'TAX_INVOICE' ? 'Tax Invoice' : 'Delivery Challan'}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span>Billing Date:</span>
+              <strong className="text-zinc-200">
+                {new Date(invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </strong>
+            </div>
+            <div className="flex justify-between">
+              <span>Customer Party:</span>
+              <strong className="text-zinc-200">{customerDetails.partyName}</strong>
+            </div>
+            <div className="flex justify-between pt-2.5 border-t border-zinc-900">
+              <span className="font-semibold text-zinc-300">Total Paid/Payable:</span>
+              <strong className="text-indigo-400 font-bold text-sm">Rs.{currentPayableAmount.toLocaleString('en-IN')}</strong>
+            </div>
+          </div>
+          
+          {/* Action buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+            <button
+              onClick={handleReset}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl text-xs transition duration-300 shadow-xl shadow-indigo-600/20 font-outfit uppercase tracking-wider"
+            >
+              Generate Another {type === 'TAX_INVOICE' ? 'Invoice' : 'Challan'}
+            </button>
+            <button
+              onClick={onSaveSuccess}
+              className="bg-zinc-900 hover:bg-zinc-855 text-zinc-300 hover:text-white font-bold py-3.5 px-6 rounded-xl text-xs transition border border-zinc-800 font-outfit uppercase tracking-wider"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto py-6 px-4">
@@ -370,9 +468,24 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
           
           {/* Customer Card */}
           <div className="glass p-5 rounded-2xl border border-zinc-800 shadow-xl">
-            <div className="flex items-center space-x-2 mb-4 text-indigo-400">
-              <User className="h-5 w-5" />
-              <h2 className="text-sm font-bold text-zinc-200 uppercase tracking-wide">Customer Details</h2>
+            <div className="flex items-center justify-between mb-4 text-indigo-400">
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5" />
+                <h2 className="text-sm font-bold text-zinc-200 uppercase tracking-wide">Customer Details</h2>
+              </div>
+              {type === 'DELIVERY_CHALLAN' && (
+                <button
+                  type="button"
+                  onClick={() => setIsSwappedAddress(!isSwappedAddress)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition ${
+                    isSwappedAddress 
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/20' 
+                      : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-850'
+                  }`}
+                >
+                  {isSwappedAddress ? 'Address Swapped (Consignor ⇄ Consignee)' : 'Swap Addresses (Consignment Return)'}
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -528,6 +641,13 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                 />
               </div>
             </div>
+            
+            {/* Visual indicator for swapped address return challans */}
+            {type === 'DELIVERY_CHALLAN' && isSwappedAddress && (
+              <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-400 text-xs leading-normal">
+                <strong>Consignment Return Mode Active:</strong> Customer (Consignor) will be printed as the Sender at the top, and your active brand profile (Consignee) will be printed as the Recipient at the bottom of the Challan copies.
+              </div>
+            )}
           </div>
 
           {/* Merged Item Grid Panel */}

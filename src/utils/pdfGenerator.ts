@@ -120,19 +120,27 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       });
     }
 
-    const brandName = profile.brandName.toUpperCase();
     const brandColor = (templateId === 2) ? primaryColor : (templateId === 3) ? accentColor : textColor;
-    
-    page.drawText(brandName, { x: 45, y: height - 90, size: 14, font: helveticaBold, color: brandColor });
-    page.drawText(profile.legalName, { x: 45, y: height - 105, size: 9, font: helveticaFont, color: textColor });
-    page.drawText(profile.tagline ? `"${profile.tagline}"` : '', { x: 45, y: height - 118, size: 8, font: helveticaFont, color: darkGray });
 
-    const addressLines = [
-      profile.address,
-      `${profile.city} - ${profile.stateName} (Code: ${profile.stateCode})`,
-      `Phone: ${profile.phone} | Email: ${profile.email}`,
-      `GSTIN: ${profile.gstin} | PAN: ${profile.pan}`,
-    ];
+    const sName = invoice.isSwappedAddress ? invoice.customerDetails.partyName.toUpperCase() : profile.brandName.toUpperCase();
+    const sLegalName = invoice.isSwappedAddress ? invoice.customerDetails.partyName : profile.legalName;
+    const sTagline = invoice.isSwappedAddress ? 'CONSIGNOR / SENDER' : (profile.tagline ? `"${profile.tagline}"` : '');
+    const sAddress = invoice.isSwappedAddress ? invoice.customerDetails.address : profile.address;
+    const sCityState = invoice.isSwappedAddress 
+      ? `${invoice.customerDetails.city} - ${invoice.customerDetails.stateName} (Code: ${invoice.customerDetails.stateCode})`
+      : `${profile.city} - ${profile.stateName} (Code: ${profile.stateCode})`;
+    const sContact = invoice.isSwappedAddress 
+      ? `Phone: ${invoice.customerDetails.phone}`
+      : `Phone: ${profile.phone} | Email: ${profile.email}`;
+    const sGstinPan = invoice.isSwappedAddress 
+      ? `GSTIN: ${invoice.customerDetails.gstin || 'NILL'} | PAN/Aadhaar: ${invoice.customerDetails.panAadhaar}`
+      : `GSTIN: ${profile.gstin} | PAN: ${profile.pan}`;
+    
+    page.drawText(sName, { x: 45, y: height - 90, size: 14, font: helveticaBold, color: brandColor });
+    page.drawText(sLegalName, { x: 45, y: height - 105, size: 9, font: helveticaFont, color: textColor });
+    page.drawText(sTagline, { x: 45, y: height - 118, size: 8, font: helveticaFont, color: darkGray });
+
+    const addressLines = [sAddress, sCityState, sContact, sGstinPan];
     let profileY = height - 132;
     addressLines.forEach((line) => {
       page.drawText(line, { x: 45, y: profileY, size: 8.5, font: helveticaFont, color: textColor });
@@ -171,18 +179,23 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     page.drawText(isChallan ? 'CONSIGNEE DETAILS:' : 'BILLED TO (RECIPIENT):', { x: 45, y: custY, size: 10, font: helveticaBold, color: (templateId === 2 || templateId === 3) ? primaryColor : textColor });
     
     const custDetails = invoice.customerDetails;
-    const customerLines = [
-      `Party Name: ${custDetails.partyName}`,
-      `Phone: ${custDetails.phone}`,
-      `Address: ${custDetails.address}, ${custDetails.city}`,
-      `State: ${custDetails.stateName} (Code: ${custDetails.stateCode})`,
-    ];
+    const rName = invoice.isSwappedAddress ? profile.legalName : custDetails.partyName;
+    const rPhone = invoice.isSwappedAddress ? profile.phone : custDetails.phone;
+    const rAddress = invoice.isSwappedAddress ? `${profile.address}, ${profile.city}` : `${custDetails.address}, ${custDetails.city}`;
+    const rState = invoice.isSwappedAddress ? `${profile.stateName} (Code: ${profile.stateCode})` : `${custDetails.stateName} (Code: ${custDetails.stateCode})`;
+    const rGstinId = invoice.isSwappedAddress 
+      ? `GSTIN: ${profile.gstin} | PAN: ${profile.pan}`
+      : (custDetails.gstin && custDetails.gstin !== 'NILL' 
+         ? `GSTIN: ${custDetails.gstin} | ${custDetails.idType}: ${custDetails.panAadhaar}`
+         : `${custDetails.idType}: ${custDetails.panAadhaar}`);
 
-    if (custDetails.gstin && custDetails.gstin !== 'NILL') {
-      customerLines.push(`GSTIN: ${custDetails.gstin} | ${custDetails.idType}: ${custDetails.panAadhaar}`);
-    } else {
-      customerLines.push(`${custDetails.idType}: ${custDetails.panAadhaar}`);
-    }
+    const customerLines = [
+      `Party Name: ${rName}`,
+      `Phone: ${rPhone}`,
+      `Address: ${rAddress}`,
+      `State: ${rState}`,
+      rGstinId
+    ];
 
     let lineY = custY - 14;
     customerLines.forEach((line) => {
@@ -212,8 +225,8 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       { name: 'HSN', x: 240, width: 45, align: 'left' },
       { name: 'Purity', x: 290, width: 75, align: 'left' },
       { name: 'Weight', x: 370, width: 55, align: 'right' },
-      { name: 'Rate/g (₹)', x: 435, width: 55, align: 'right' },
-      { name: 'Taxable Val (₹)', x: 495, width: 65, align: 'right' },
+      { name: 'Rate/g (Rs.)', x: 435, width: 55, align: 'right' },
+      { name: 'Taxable Val (Rs.)', x: 495, width: 65, align: 'right' },
     ];
 
     columns.forEach((col) => {
@@ -303,26 +316,26 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     };
 
     const totalWeightStr = `${invoice.items.reduce((sum, item) => sum + item.weightInGrams, 0).toFixed(2)} g`;
-    const totalTaxableStr = `₹${invoice.items.reduce((sum, item) => sum + item.taxableAmount, 0).toFixed(2)}`;
+    const totalTaxableStr = `Rs.${invoice.items.reduce((sum, item) => sum + item.taxableAmount, 0).toFixed(2)}`;
     
     drawSummaryRow('Total Gold/Silver Weight:', totalWeightStr, false);
     drawSummaryRow('Subtotal Taxable Amount:', totalTaxableStr, false);
 
     if (invoice.discountApplied > 0) {
-      drawSummaryRow('Discount Applied (Less):', `-₹${invoice.discountApplied.toFixed(2)}`, false);
+      drawSummaryRow('Discount Applied (Less):', `-Rs.${invoice.discountApplied.toFixed(2)}`, false);
       const afterDiscount = (invoice.items.reduce((sum, item) => sum + item.taxableAmount, 0) - invoice.discountApplied);
-      drawSummaryRow('Net Taxable Subtotal:', `₹${afterDiscount.toFixed(2)}`, false);
+      drawSummaryRow('Net Taxable Subtotal:', `Rs.${afterDiscount.toFixed(2)}`, false);
     }
 
     if (invoice.taxDetails.cgst > 0 || invoice.taxDetails.sgst > 0) {
-      drawSummaryRow(`CGST (${invoice.taxDetails.cgstPercent}%):`, `₹${invoice.taxDetails.cgst.toFixed(2)}`, false);
-      drawSummaryRow(`SGST (${invoice.taxDetails.sgstPercent}%):`, `₹${invoice.taxDetails.sgst.toFixed(2)}`, false);
+      drawSummaryRow(`CGST (${invoice.taxDetails.cgstPercent}%):`, `Rs.${invoice.taxDetails.cgst.toFixed(2)}`, false);
+      drawSummaryRow(`SGST (${invoice.taxDetails.sgstPercent}%):`, `Rs.${invoice.taxDetails.sgst.toFixed(2)}`, false);
     } else if (invoice.taxDetails.igst > 0) {
-      drawSummaryRow(`IGST (${invoice.taxDetails.igstPercent}%):`, `₹${invoice.taxDetails.igst.toFixed(2)}`, false);
+      drawSummaryRow(`IGST (${invoice.taxDetails.igstPercent}%):`, `Rs.${invoice.taxDetails.igst.toFixed(2)}`, false);
     }
 
-    drawSummaryRow('Grand Total (with Tax):', `₹${invoice.grandTotal.toFixed(2)}`, false);
-    drawSummaryRow('Rounded Payable Amount:', `₹${invoice.payableAmount.toFixed(2)}`, true);
+    drawSummaryRow('Grand Total (with Tax):', `Rs.${invoice.grandTotal.toFixed(2)}`, false);
+    drawSummaryRow('Rounded Payable Amount:', `Rs.${invoice.payableAmount.toFixed(2)}`, true);
 
     const hasBank = profile.bankName && profile.bankName.trim() !== '';
     const hasUpi = profile.upiId && profile.upiId.trim() !== '';
@@ -377,7 +390,9 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     });
 
     const sigY = 90;
-    const sigLabel = `For ${profile.legalName.toUpperCase()}`;
+    const sigLabel = invoice.isSwappedAddress 
+      ? `For ${invoice.customerDetails.partyName.toUpperCase()}`
+      : `For ${profile.legalName.toUpperCase()}`;
     page.drawText(sigLabel, {
       x: width - 40 - helveticaBold.widthOfTextAtSize(sigLabel, 8.5),
       y: sigY,
@@ -404,9 +419,17 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
 
   const pdfBytes = await pdfDoc.save();
 
-  // FIX: Cast pdfBytes to any to avoid type check errors while ensuring correct browser blob compilation
   const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
+  
+  // 1. Preview PDF in a new tab/window
+  try {
+    window.open(url, '_blank');
+  } catch (e) {
+    console.error('Failed to open PDF preview window', e);
+  }
+
+  // 2. Trigger automatic download
   const link = document.createElement('a');
   link.href = url;
   const fileName = `${invoice.type === 'TAX_INVOICE' ? 'Tax_Invoice' : 'Delivery_Challan'}_${invoice.invoiceId.replace(/\//g, '_')}.pdf`;
@@ -414,5 +437,9 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+
+  // Retain blob URL for 15 seconds to allow window preview to render
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 15000);
 }
