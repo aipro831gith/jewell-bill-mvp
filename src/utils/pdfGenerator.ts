@@ -2,10 +2,8 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import type { Invoice, BusinessProfile } from '../db/database';
 
 export async function generateAndDownloadPDF(invoice: Invoice, profile: BusinessProfile) {
-  // Create a new PDFDocument
   const pdfDoc = await PDFDocument.create();
   
-  // Embed the standard Helvetica fonts
   const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
@@ -19,9 +17,11 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     year: 'numeric',
   });
 
-  // Loop exactly 3 times for the 3 distinct copies
+  // Fetch template ID: 1, 2, or 3
+  const templateId = invoice.templateId || 1;
+
   for (let i = 1; i <= numPages; i++) {
-    const page = pdfDoc.addPage([595.27, 841.89]); // A4 Size
+    const page = pdfDoc.addPage([595.27, 841.89]);
     const { width, height } = page.getSize();
 
     // Copy label logic
@@ -36,12 +36,27 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       else copyLabel = 'COPY 3: TRIPLICATE FOR SUPPLIER';
     }
 
-    // Colors
-    const primaryColor = rgb(0.08, 0.08, 0.12); // #15151f
-    const textColor = rgb(0.15, 0.15, 0.18);
-    const lightGray = rgb(0.95, 0.95, 0.96);
+    // Color definitions based on Template ID
+    let primaryColor = rgb(0.08, 0.08, 0.12); // #15151f
+    let accentColor = rgb(0.12, 0.12, 0.16);
+    let borderGray = rgb(0.8, 0.8, 0.8);
+    let lightGray = rgb(0.95, 0.95, 0.96);
     const darkGray = rgb(0.4, 0.4, 0.4);
-    const borderGray = rgb(0.8, 0.8, 0.8);
+    const textColor = rgb(0.15, 0.15, 0.18);
+
+    if (templateId === 2) {
+      // Elegant Crimson Theme
+      primaryColor = rgb(0.53, 0.07, 0.22); // Wine red (#881337)
+      accentColor = rgb(0.7, 0.1, 0.3);
+      borderGray = rgb(0.85, 0.75, 0.78);
+      lightGray = rgb(0.98, 0.94, 0.95);
+    } else if (templateId === 3) {
+      // Luxurious Gold Theme
+      primaryColor = rgb(0.05, 0.05, 0.05); // Charcoal black (#0c0c0c)
+      accentColor = rgb(0.76, 0.52, 0.1); // Warm gold (#c2851a)
+      borderGray = rgb(0.75, 0.65, 0.45); // Light gold-tinted gray
+      lightGray = rgb(0.97, 0.96, 0.92);
+    }
 
     // Draw page outer border
     page.drawRectangle({
@@ -53,41 +68,78 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       borderWidth: 1,
     });
 
-    // Draw document header banner
-    page.drawRectangle({
-      x: 30,
-      y: height - 65,
-      width: width - 60,
-      height: 35,
-      color: primaryColor,
-    });
+    if (templateId === 1 || templateId === 3) {
+      // Draw colored top banner for Classic & Gold templates
+      page.drawRectangle({
+        x: 30,
+        y: height - 65,
+        width: width - 60,
+        height: 35,
+        color: primaryColor,
+      });
 
-    // Header Title
-    const titleText = isChallan ? 'DELIVERY CHALLAN' : 'TAX INVOICE';
-    page.drawText(titleText, {
-      x: 45,
-      y: height - 52,
-      size: 14,
-      font: helveticaBold,
-      color: rgb(1, 1, 1),
-    });
+      // Gold template top border accent
+      if (templateId === 3) {
+        page.drawLine({
+          start: { x: 30, y: height - 65 },
+          end: { x: width - 30, y: height - 65 },
+          color: accentColor,
+          thickness: 1.5,
+        });
+      }
 
-    // Copy label on header right
-    page.drawText(copyLabel, {
-      x: width - 250,
-      y: height - 50,
-      size: 9,
-      font: helveticaBold,
-      color: rgb(1, 1, 1),
-    });
+      // Title
+      page.drawText(isChallan ? 'DELIVERY CHALLAN' : 'TAX INVOICE', {
+        x: 45,
+        y: height - 52,
+        size: 13,
+        font: helveticaBold,
+        color: rgb(1, 1, 1),
+      });
+
+      // Copy Label
+      page.drawText(copyLabel, {
+        x: width - 250,
+        y: height - 50,
+        size: 8.5,
+        font: helveticaBold,
+        color: rgb(1, 1, 1),
+      });
+    } else {
+      // Template 2 (Crimson): Clean and minimal bottom border line header (No banner block)
+      page.drawLine({
+        start: { x: 30, y: height - 65 },
+        end: { x: width - 30, y: height - 65 },
+        color: primaryColor,
+        thickness: 2,
+      });
+
+      page.drawText(isChallan ? 'DELIVERY CHALLAN' : 'TAX INVOICE', {
+        x: 45,
+        y: height - 52,
+        size: 14,
+        font: helveticaBold,
+        color: primaryColor,
+      });
+
+      page.drawText(copyLabel, {
+        x: width - 250,
+        y: height - 50,
+        size: 8.5,
+        font: helveticaBold,
+        color: textColor,
+      });
+    }
 
     // Profile details (Top Left)
     const brandName = profile.brandName.toUpperCase();
-    page.drawText(brandName, { x: 45, y: height - 90, size: 14, font: helveticaBold, color: textColor });
+    const brandColor = (templateId === 2) ? primaryColor : (templateId === 3) ? accentColor : textColor;
+    
+    page.drawText(brandName, { x: 45, y: height - 90, size: 14, font: helveticaBold, color: brandColor });
     page.drawText(profile.legalName, { x: 45, y: height - 105, size: 9, font: helveticaFont, color: textColor });
     page.drawText(profile.tagline ? `"${profile.tagline}"` : '', { x: 45, y: height - 118, size: 8, font: helveticaFont, color: darkGray });
 
-    // Address lines
+    // Supplier address lines
     const addressLines = [
       profile.address,
       `${profile.city} - ${profile.stateName} (Code: ${profile.stateCode})`,
@@ -108,9 +160,14 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       { label: isChallan ? 'Challan No:' : 'Invoice No:', val: invoice.invoiceId, bold: true },
       { label: 'Date:', val: invoiceDateStr, bold: false },
       { label: 'Place of Supply:', val: invoice.customerDetails.placeOfSupply, bold: false },
-      { label: 'Payment Mode:', val: invoice.paymentMode, bold: false },
       { label: 'GST State:', val: `${profile.stateName} (Code: ${profile.stateCode})`, bold: false },
     ];
+
+    // Optionally draw payment mode if chosen
+    const showPaymentMode = invoice.paymentMode && invoice.paymentMode !== 'None';
+    if (showPaymentMode) {
+      invoiceInfo.push({ label: 'Payment Mode:', val: invoice.paymentMode, bold: false });
+    }
 
     invoiceInfo.forEach((item) => {
       page.drawText(item.label, { x: infoX, y: infoY, size: 9, font: helveticaBold, color: textColor });
@@ -118,7 +175,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       infoY -= 14;
     });
 
-    // Horizontal Separator Line
+    // Separator line
     page.drawLine({
       start: { x: 30, y: height - 195 },
       end: { x: width - 30, y: height - 195 },
@@ -126,9 +183,9 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       thickness: 1,
     });
 
-    // Customer details section (Billed To)
+    // Customer details
     const custY = height - 212;
-    page.drawText(isChallan ? 'CONSIGNEE DETAILS:' : 'BILLED TO (RECIPIENT):', { x: 45, y: custY, size: 10, font: helveticaBold, color: textColor });
+    page.drawText(isChallan ? 'CONSIGNEE DETAILS:' : 'BILLED TO (RECIPIENT):', { x: 45, y: custY, size: 10, font: helveticaBold, color: (templateId === 2 || templateId === 3) ? primaryColor : textColor });
     
     const custDetails = invoice.customerDetails;
     const customerLines = [
@@ -136,8 +193,13 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       `Phone: ${custDetails.phone}`,
       `Address: ${custDetails.address}, ${custDetails.city}`,
       `State: ${custDetails.stateName} (Code: ${custDetails.stateCode})`,
-      `GSTIN: ${custDetails.gstin} | ${custDetails.idType}: ${custDetails.panAadhaar}`,
     ];
+
+    if (custDetails.gstin && custDetails.gstin !== 'NILL') {
+      customerLines.push(`GSTIN: ${custDetails.gstin} | ${custDetails.idType}: ${custDetails.panAadhaar}`);
+    } else {
+      customerLines.push(`${custDetails.idType}: ${custDetails.panAadhaar}`);
+    }
 
     let lineY = custY - 14;
     customerLines.forEach((line) => {
@@ -145,7 +207,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       lineY -= 12;
     });
 
-    // Horizontal Line before item table
+    // Separator line before item table
     page.drawLine({
       start: { x: 30, y: height - 285 },
       end: { x: width - 30, y: height - 285 },
@@ -153,7 +215,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       thickness: 1,
     });
 
-    // Table Header
+    // Table Header (WITHOUT HSN)
     const tableHeaderY = height - 300;
     page.drawRectangle({
       x: 30,
@@ -163,27 +225,28 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       color: lightGray,
     });
 
+    // Re-mapped columns without HSN
     const columns = [
-      { name: 'Sr', x: 35, width: 20, align: 'left' },
-      { name: 'Description of Goods', x: 60, width: 180, align: 'left' },
-      { name: 'HSN', x: 250, width: 45, align: 'left' },
-      { name: 'Purity', x: 305, width: 65, align: 'left' },
-      { name: 'Weight', x: 380, width: 45, align: 'right' },
-      { name: 'Rate/g', x: 435, width: 50, align: 'right' },
+      { name: 'Sr', x: 35, width: 25, align: 'left' },
+      { name: 'Description of Goods', x: 65, width: 220, align: 'left' },
+      { name: 'Purity', x: 290, width: 75, align: 'left' },
+      { name: 'Weight', x: 370, width: 55, align: 'right' },
+      { name: 'Rate/g (₹)', x: 435, width: 55, align: 'right' },
       { name: 'Taxable Val (₹)', x: 495, width: 65, align: 'right' },
     ];
 
     columns.forEach((col) => {
+      const colColor = (templateId === 2 || templateId === 3) ? primaryColor : textColor;
       page.drawText(col.name, {
         x: col.align === 'right' ? col.x + col.width - helveticaBold.widthOfTextAtSize(col.name, 8.5) : col.x,
         y: tableHeaderY,
         size: 8.5,
         font: helveticaBold,
-        color: textColor,
+        color: colColor,
       });
     });
 
-    // Draw table border line under header
+    // Divider under table header
     page.drawLine({
       start: { x: 30, y: tableHeaderY - 5 },
       end: { x: width - 30, y: tableHeaderY - 5 },
@@ -194,13 +257,16 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     // Table rows
     let rowY = tableHeaderY - 20;
     invoice.items.forEach((item, index) => {
+      // Purity condition: Suppress if None, 0, or empty
+      const isPurityNone = item.purityValue === 'None' || item.purityValue === '0' || item.purityValue.trim() === '';
+      const purityDisplay = isPurityNone ? '' : `${item.purityValue} (${item.purityType === 'Karat' ? 'K' : '%'})`;
+
       const rowData = [
-        { val: (index + 1).toString(), x: 35, width: 20, align: 'left' },
-        { val: `${item.metal} - ${item.itemName}`, x: 60, width: 180, align: 'left' },
-        { val: item.hsn, x: 250, width: 45, align: 'left' },
-        { val: `${item.purityValue} (${item.purityType === 'Karat' ? 'K' : '%'})`, x: 305, width: 65, align: 'left' },
-        { val: `${item.weight} ${item.weightUnit}`, x: 380, width: 45, align: 'right' },
-        { val: item.ratePerGram.toFixed(2), x: 435, width: 50, align: 'right' },
+        { val: (index + 1).toString(), x: 35, width: 25, align: 'left' },
+        { val: `${item.metal} - ${item.itemName}`, x: 65, width: 220, align: 'left' },
+        { val: purityDisplay, x: 290, width: 75, align: 'left' },
+        { val: `${item.weight} ${item.weightUnit}`, x: 370, width: 55, align: 'right' },
+        { val: item.ratePerGram.toFixed(2), x: 435, width: 55, align: 'right' },
         { val: item.taxableAmount.toFixed(2), x: 495, width: 65, align: 'right' },
       ];
 
@@ -218,8 +284,8 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       rowY -= 15;
     });
 
-    // Grid vertical lines to make it look professional
-    const vLines = [30, 55, 245, 300, 375, 430, 490, width - 30];
+    // Grid vertical lines
+    const vLines = [30, 60, 285, 365, 425, 490, width - 30];
     vLines.forEach((x) => {
       page.drawLine({
         start: { x, y: tableHeaderY + 13 },
@@ -229,7 +295,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       });
     });
 
-    // Horizontal line under last row
+    // Divider line under last row
     page.drawLine({
       start: { x: 30, y: rowY + 10 },
       end: { x: width - 30, y: rowY + 10 },
@@ -237,30 +303,29 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       thickness: 1,
     });
 
-    // Summary calculation rows (Right-aligned under table)
+    // Summary Calculations Block
     let summaryY = rowY - 5;
     
-    // Helper function to draw calculation row
     const drawSummaryRow = (label: string, valueStr: string, isBold: boolean = false) => {
       const fontToUse = isBold ? helveticaBold : helveticaFont;
+      const labelColor = isBold && (templateId === 2 || templateId === 3) ? primaryColor : textColor;
       page.drawText(label, {
         x: width - 240,
         y: summaryY,
         size: 9,
         font: fontToUse,
-        color: textColor,
+        color: labelColor,
       });
       page.drawText(valueStr, {
         x: width - 40 - fontToUse.widthOfTextAtSize(valueStr, 9),
         y: summaryY,
         size: 9,
         font: fontToUse,
-        color: textColor,
+        color: labelColor,
       });
       summaryY -= 14;
     };
 
-    // Total weight and raw subtotal
     const totalWeightStr = `${invoice.items.reduce((sum, item) => sum + item.weightInGrams, 0).toFixed(2)} g`;
     const totalTaxableStr = `₹${invoice.items.reduce((sum, item) => sum + item.taxableAmount, 0).toFixed(2)}`;
     
@@ -286,7 +351,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     drawSummaryRow('Grand Total (with Tax):', `₹${invoice.grandTotal.toFixed(2)}`, false);
     drawSummaryRow('Rounded Payable Amount:', `₹${invoice.payableAmount.toFixed(2)}`, true);
 
-    // Bank and UPI Details (Bottom Left Box - Skip dynamically if empty)
+    // Bank details (Skip dynamically if empty)
     const hasBank = profile.bankName && profile.bankName.trim() !== '';
     const hasUpi = profile.upiId && profile.upiId.trim() !== '';
     
@@ -302,7 +367,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
         color: lightGray,
       });
 
-      page.drawText('SUPPLIER BANK & PAYMENT DETAILS', { x: 45, y: bankBoxY, size: 8, font: helveticaBold, color: textColor });
+      page.drawText('SUPPLIER BANK & PAYMENT DETAILS', { x: 45, y: bankBoxY, size: 8, font: helveticaBold, color: (templateId === 2 || templateId === 3) ? primaryColor : textColor });
       
       let bankInfoY = bankBoxY - 12;
       if (hasBank) {
@@ -322,16 +387,16 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       }
     }
 
-    // Terms / Signatures / Bottom Declaration
+    // Terms / Signatures
     const termsY = 55;
     page.drawText('Terms & Conditions:', { x: 40, y: termsY + 12, size: 8, font: helveticaBold, color: textColor });
     page.drawText('1. Goods once sold will not be taken back.', { x: 40, y: termsY, size: 7, font: helveticaFont, color: darkGray });
     page.drawText('2. We declare that this invoice shows the actual price of the goods described.', { x: 40, y: termsY - 8, size: 7, font: helveticaFont, color: darkGray });
 
-    // Bottom Left Footer: E&OE
+    // E&OE
     page.drawText('E&OE', { x: 40, y: termsY - 20, size: 8, font: helveticaBold, color: textColor });
 
-    // Bottom Right Footer: SUBJECT TO KOLKATA JURISDICTION
+    // Jurisdiction Footer
     const jurLabel = `SUBJECT TO ${profile.jurisdiction.toUpperCase()} JURISDICTION`;
     page.drawText(jurLabel, {
       x: width - 40 - helveticaBold.widthOfTextAtSize(jurLabel, 7.5),
@@ -341,7 +406,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       color: textColor,
     });
 
-    // Authorised Signatory block
+    // Signatures
     const sigY = 90;
     const sigLabel = `For ${profile.legalName.toUpperCase()}`;
     page.drawText(sigLabel, {
@@ -360,7 +425,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       color: textColor,
     });
 
-    // Signature Line
     page.drawLine({
       start: { x: width - 150, y: sigY - 25 },
       end: { x: width - 40, y: sigY - 25 },
@@ -369,10 +433,8 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     });
   }
 
-  // Serialize the PDFDocument to bytes (a Uint8Array)
   const pdfBytes = await pdfDoc.save();
 
-  // Trigger browser download
   const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

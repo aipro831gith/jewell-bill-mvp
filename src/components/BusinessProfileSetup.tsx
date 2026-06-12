@@ -45,9 +45,10 @@ export const INDIAN_STATES = [
 interface BusinessProfileSetupProps {
   onSetupComplete: (profile: BusinessProfile) => void;
   initialData?: BusinessProfile | null;
+  onCancel?: () => void;
 }
 
-export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSetupComplete, initialData }) => {
+export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSetupComplete, initialData, onCancel }) => {
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(initialData || {
     brandName: '',
     legalName: '',
@@ -545,7 +546,16 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
           </div>
 
           {/* Submit Action */}
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end items-center space-x-3 pt-4">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="bg-zinc-800 hover:bg-zinc-705 text-zinc-300 hover:text-white font-medium px-6 py-3 rounded-lg text-sm transition font-outfit border border-zinc-700"
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="submit"
               disabled={compressingLogo || compressingQr}

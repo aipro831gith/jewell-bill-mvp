@@ -46,7 +46,7 @@ export interface InvoiceItem {
   itemName: string;
   hsn: string;
   purityType: 'Karat' | 'Percentage (%)';
-  purityValue: string; // e.g. "22K916" or "91.6"
+  purityValue: string; // e.g. "22K916" or "91.6" or "None"
   weight: number; // in grams or kg entered
   weightUnit: 'gm' | 'kg';
   weightInGrams: number; // calculated standard value
@@ -59,6 +59,7 @@ export interface Invoice {
   type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN';
   date: number; // timestamp
   profileId: number;
+  templateId: 1 | 2 | 3; // Selected PDF Design template
   customerDetails: {
     partyName: string;
     phone: string;
@@ -83,7 +84,7 @@ export interface Invoice {
   discountApplied: number;
   grandTotal: number;
   payableAmount: number;
-  paymentMode: 'Cash' | 'Card' | 'Bank Transfer' | 'UPI';
+  paymentMode: 'Cash' | 'Card' | 'Bank Transfer' | 'UPI' | 'RTGS' | 'None';
 }
 
 interface JewellBillDBSchema extends DBSchema {
@@ -109,14 +110,12 @@ export function getDB() {
   if (!dbPromise) {
     dbPromise = openDB<JewellBillDBSchema>('JewellBillDB', 1, {
       upgrade(db) {
-        // BusinessProfiles store
         if (!db.objectStoreNames.contains('BusinessProfiles')) {
           db.createObjectStore('BusinessProfiles', {
             keyPath: 'id',
             autoIncrement: true,
           });
         }
-        // Customers store for auto-fill
         if (!db.objectStoreNames.contains('Customers')) {
           const customerStore = db.createObjectStore('Customers', {
             keyPath: 'id',
@@ -124,7 +123,6 @@ export function getDB() {
           });
           customerStore.createIndex('partyName', 'partyName');
         }
-        // Invoices store
         if (!db.objectStoreNames.contains('Invoices')) {
           db.createObjectStore('Invoices', {
             keyPath: 'invoiceId',
@@ -137,22 +135,53 @@ export function getDB() {
 }
 
 // Business Profile Operations
+export async function getAllProfiles(): Promise<BusinessProfile[]> {
+  const db = await getDB();
+  return await db.getAll('BusinessProfiles');
+}
+
+export async function getProfileById(id: number): Promise<BusinessProfile | undefined> {
+  const db = await getDB();
+  return await db.get('BusinessProfiles', id);
+}
+
 export async function getActiveProfile(): Promise<BusinessProfile | null> {
   const db = await getDB();
   const profiles = await db.getAll('BusinessProfiles');
-  return profiles.length > 0 ? profiles[0] : null;
+  if (profiles.length === 0) return null;
+  
+  // Use localStorage to remember switched profile
+  const storedIdStr = localStorage.getItem('activeProfileId');
+  if (storedIdStr) {
+    const storedId = parseInt(storedIdStr, 10);
+    const matched = profiles.find((p) => p.id === storedId);
+    if (matched) return matched;
+  }
+  
+  // Fallback to first profile
+  return profiles[0];
 }
 
 export async function saveProfile(profile: BusinessProfile): Promise<number> {
   const db = await getDB();
-  // We only maintain ONE active profile, so if there is an existing one, update it.
-  const profiles = await db.getAll('BusinessProfiles');
-  if (profiles.length > 0 && profiles[0].id !== undefined) {
-    profile.id = profiles[0].id;
+  if (profile.id !== undefined) {
     await db.put('BusinessProfiles', profile);
-    return profiles[0].id;
+    return profile.id;
   } else {
-    return await db.add('BusinessProfiles', profile);
+    const id = await db.add('BusinessProfiles', profile);
+    profile.id = id;
+    return id;
+  }
+}
+
+export async function deleteProfile(id: number): Promise<void> {
+  const db = await getDB();
+  await db.delete('BusinessProfiles', id);
+  
+  // Clean active profile selector if deleted
+  const storedIdStr = localStorage.getItem('activeProfileId');
+  if (storedIdStr && parseInt(storedIdStr, 10) === id) {
+    localStorage.removeItem('activeProfileId');
   }
 }
 
@@ -172,7 +201,6 @@ export async function saveCustomer(customer: Omit<Customer, 'id'>): Promise<numb
   const db = await getDB();
   const allCustomers = await db.getAll('Customers');
   
-  // Prevent duplicate customers by matching name and phone
   const existing = allCustomers.find(
     (c) =>
       c.partyName.toLowerCase() === customer.partyName.toLowerCase() &&
@@ -203,10 +231,9 @@ export async function saveInvoice(invoice: Invoice): Promise<string> {
   const db = await getDB();
   await db.put('Invoices', invoice);
   
-  // Silent customer saving/updating on invoice creation
   const customerToSave: Omit<Customer, 'id'> = {
     partyName: invoice.customerDetails.partyName,
-    phone: invoice.customerDetails.phone,
+    phone: invoice.customerDetails.phone.replace(/^\+\d+\s/, ''), // strip prefix
     address: invoice.customerDetails.address,
     city: invoice.customerDetails.city,
     stateName: invoice.customerDetails.stateName,
@@ -215,7 +242,6 @@ export async function saveInvoice(invoice: Invoice): Promise<string> {
     panAadhaar: invoice.customerDetails.panAadhaar,
   };
   
-  // Do not save "NILL" customers as templates
   if (customerToSave.partyName !== 'NILL') {
     await saveCustomer(customerToSave);
   }
@@ -227,14 +253,12 @@ export async function getNextInvoiceNumber(prefix: string, type: 'TAX_INVOICE' |
   const db = await getDB();
   const invoices = await db.getAll('Invoices');
   
-  // Calculate current year code e.g. 26-27
   const now = new Date();
   const currentYear = now.getFullYear();
   const nextYearShort = (currentYear + 1).toString().slice(-2);
   const prevYearShort = (currentYear - 1).toString().slice(-2);
   const currentYearShort = currentYear.toString().slice(-2);
 
-  // Financial Year starts April 1st
   let fy = '';
   if (now.getMonth() >= 3) {
     fy = `${currentYearShort}-${nextYearShort}`;
