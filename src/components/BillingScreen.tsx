@@ -115,7 +115,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       id: Math.random().toString(36).substring(2, 9),
       metal: 'GOLD',
       itemName: 'Gold Ornaments',
-      hsn: '', // neglected / blank
+      hsn: '711319', // Default Gold Ornaments HSN
       purityType: 'Karat',
       purityValue: '22K916',
       weight: 0,
@@ -140,13 +140,28 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         if (field === 'metal') {
           if (value === 'GOLD') {
             updated.itemName = 'Gold Ornaments';
+            updated.hsn = '711319';
             updated.purityType = 'Karat';
             updated.purityValue = '22K916';
           } else {
             updated.itemName = 'Silver Ornaments';
+            updated.hsn = '711311';
             updated.purityType = 'Karat';
             updated.purityValue = '18K750';
           }
+        } else if (field === 'itemName') {
+          // Map exact HSN
+          const hsnMap: Record<string, string> = {
+            'Gold Ornaments': '711319',
+            'Pure Gold Bullion': '710812',
+            'Gold Alloy': '710813',
+            'Goldsmiths Wares': '711419',
+            'Silver Ornaments': '711311',
+            'Pure Silver Bullion': '710691',
+            'Silver Alloy': '710692',
+            'Silversmiths Wares': '711411'
+          };
+          updated.hsn = hsnMap[value] || '';
         }
 
         // Purity defaults on change
@@ -497,6 +512,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                     <tr className="text-left text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                       <th className="pb-2">Metal</th>
                       <th className="pb-2">Description</th>
+                      <th className="pb-2">HSN</th>
                       <th className="pb-2">Purity System</th>
                       <th className="pb-2">Purity Value</th>
                       <th className="pb-2">Weight</th>
@@ -541,6 +557,14 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                               </>
                             )}
                           </select>
+                        </td>
+                        <td className="py-2.5 pr-2">
+                          <input
+                            type="text"
+                            value={item.hsn}
+                            onChange={(e) => handleItemFieldChange(item.id, 'hsn', e.target.value)}
+                            className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-400 focus:outline-none w-16 text-center font-mono"
+                          />
                         </td>
                         <td className="py-2.5 pr-2">
                           <select

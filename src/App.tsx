@@ -87,6 +87,12 @@ function App() {
     }
   };
 
+  const handleLogOut = () => {
+    localStorage.removeItem('activeProfileId');
+    setProfile(null);
+    setScreen('SETUP');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center space-y-4">
@@ -119,6 +125,7 @@ function App() {
           }}
           onSwitchProfile={handleSwitchProfile}
           onDeleteProfile={handleDeleteProfile}
+          onLogOut={handleLogOut}
         />
       )}
 

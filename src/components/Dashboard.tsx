@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Invoice, BusinessProfile } from '../db/database';
-import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, ChevronDown, Trash2, ShieldCheck } from 'lucide-react';
+import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, Trash2, ShieldCheck, LogOut, UserPlus } from 'lucide-react';
 import { generateAndDownloadPDF } from '../utils/pdfGenerator';
 
 interface DashboardProps {
@@ -12,6 +12,7 @@ interface DashboardProps {
   onAddNewProfile: () => void;
   onSwitchProfile: (id: number) => void;
   onDeleteProfile: (id: number) => void;
+  onLogOut: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -23,14 +24,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAddNewProfile,
   onSwitchProfile,
   onDeleteProfile,
+  onLogOut,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'TAX_INVOICE' | 'DELIVERY_CHALLAN'>('ALL');
   const [showModal, setShowModal] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<1 | 2 | 3>(1); // Default template
+  const [selectedTemplate, setSelectedTemplate] = useState<1 | 2 | 3>(1);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   
-  // Profile switcher state
+  // Profile switcher popover state
   const [showSwitcher, setShowSwitcher] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
 
@@ -56,7 +58,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     let totalOnlineCollection = 0;
 
     invoices.forEach((inv) => {
-      // Only calculate stats for the active profile's invoices
       if (inv.profileId === profile.id) {
         if (inv.type === 'TAX_INVOICE') {
           totalTaxInvoicesCount++;
@@ -84,7 +85,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const filteredInvoices = useMemo(() => {
     return invoices
       .filter((inv) => {
-        // Only show invoices belonging to the active profile
         if (inv.profileId !== profile.id) return false;
 
         const matchesSearch =
@@ -122,6 +122,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const firstLetter = profile.brandName ? profile.brandName.charAt(0).toUpperCase() : 'B';
+
   return (
     <div className="min-h-screen pb-24 px-4 sm:px-6 lg:px-8">
       {/* Brand Header Banner */}
@@ -136,33 +138,71 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 className="h-14 w-14 object-contain rounded-lg"
               />
             </div>
-            
-            {/* Account Switcher Header */}
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-white font-outfit uppercase">
+                {profile.brandName}
+              </h1>
+              <p className="text-xs text-zinc-400 font-medium">
+                {profile.tagline || 'Wholesale & Manufacturers'} | Estd: {profile.estdYear}
+              </p>
+              <p className="text-[10px] text-zinc-500">
+                GSTIN: {profile.gstin} | Jurisdiction: {profile.jurisdiction}
+              </p>
+            </div>
+          </div>
+
+          {/* Right Header Panel containing Switcher Circle & Settings */}
+          <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
+            <button
+              onClick={onEditProfile}
+              className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1 transition border border-zinc-800"
+            >
+              <Settings className="h-4 w-4 text-zinc-400" />
+              <span>Edit Brand</span>
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1 transition shadow-lg shadow-indigo-600/20"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create Invoice</span>
+            </button>
+
+            {/* Google-like Account Swapper (Top Right Circular Icon) */}
             <div className="relative" ref={switcherRef}>
               <button
                 onClick={() => setShowSwitcher(!showSwitcher)}
-                className="flex items-center space-x-2 text-left group focus:outline-none"
+                className="w-10 h-10 rounded-full bg-indigo-600/20 border-2 border-indigo-500 hover:border-white transition flex items-center justify-center overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <div>
-                  <div className="flex items-center space-x-1.5">
-                    <h1 className="text-xl font-bold tracking-tight text-white font-outfit uppercase group-hover:text-indigo-400 transition">
-                      {profile.brandName}
-                    </h1>
-                    <ChevronDown className="h-4 w-4 text-zinc-400 group-hover:text-indigo-400 transition" />
-                  </div>
-                  <p className="text-xs text-zinc-400 font-medium">
-                    {profile.tagline || 'Wholesale & Manufacturers'} | Estd: {profile.estdYear}
-                  </p>
-                </div>
+                {profile.logoData ? (
+                  <img src={profile.logoData} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-sm font-bold text-white">{firstLetter}</span>
+                )}
               </button>
 
-              {/* Google-like Account Dropdown */}
+              {/* Popover Dropdown (Google Style) */}
               {showSwitcher && (
-                <div className="absolute left-0 mt-2 w-72 rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl z-50 p-3 divide-y divide-zinc-900 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="py-2 text-[10px] uppercase font-bold tracking-wider text-zinc-500 px-2">
-                    Switch Brand Profile
+                <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl z-50 p-4 divide-y divide-zinc-900 animate-in fade-in slide-in-from-top-2 duration-150">
+                  {/* Active Profile Header */}
+                  <div className="flex flex-col items-center text-center pb-4">
+                    <div className="w-16 h-16 rounded-full bg-indigo-600/25 border-2 border-indigo-500 flex items-center justify-center overflow-hidden mb-2">
+                      {profile.logoData ? (
+                        <img src={profile.logoData} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xl font-bold text-white">{firstLetter}</span>
+                      )}
+                    </div>
+                    <div className="text-sm font-bold text-zinc-100 uppercase tracking-tight">{profile.brandName}</div>
+                    <div className="text-xs text-zinc-400 mt-0.5">{profile.legalName}</div>
+                    <div className="text-[10px] text-zinc-500 font-mono mt-1">{profile.email}</div>
                   </div>
-                  <div className="py-2 space-y-1 max-h-48 overflow-y-auto">
+
+                  {/* Switch Account Section */}
+                  <div className="py-3 max-h-40 overflow-y-auto space-y-1">
+                    <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-500 px-1.5 mb-1">
+                      Switch Active Brand
+                    </div>
                     {profiles.map((p) => (
                       <div
                         key={p.id}
@@ -172,26 +212,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             setShowSwitcher(false);
                           }
                         }}
-                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${
-                          p.id === profile.id ? 'bg-indigo-600/10 border border-indigo-500/30' : 'hover:bg-zinc-900 border border-transparent'
+                        className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition ${
+                          p.id === profile.id ? 'bg-indigo-600/10 border border-indigo-500/20' : 'hover:bg-zinc-900 border border-transparent'
                         }`}
                       >
-                        <div className="flex items-center space-x-2.5 overflow-hidden">
-                          <img
-                            src={p.logoData}
-                            alt=""
-                            className="h-8 w-8 object-contain rounded bg-zinc-950 border border-zinc-800 shrink-0"
-                          />
+                        <div className="flex items-center space-x-2 overflow-hidden">
+                          <div className="w-6 h-6 rounded-full bg-zinc-900 border border-zinc-850 flex items-center justify-center overflow-hidden shrink-0 text-[10px] font-bold text-zinc-400">
+                            {p.logoData ? <img src={p.logoData} alt="" className="w-full h-full object-cover" /> : p.brandName.charAt(0).toUpperCase()}
+                          </div>
                           <div className="truncate text-left">
-                            <div className="text-xs font-bold text-zinc-200 truncate uppercase">{p.brandName}</div>
-                            <div className="text-[10px] text-zinc-500 truncate">{p.legalName}</div>
+                            <span className="text-xs font-bold text-zinc-200 uppercase block truncate">{p.brandName}</span>
                           </div>
                         </div>
                         {p.id !== profile.id && p.id !== undefined && (
                           <button
                             onClick={(e) => handleDeleteProfileClick(p.id!, e)}
-                            className="text-zinc-500 hover:text-red-400 p-1 transition rounded hover:bg-red-500/10"
-                            title="Delete profile"
+                            className="text-zinc-500 hover:text-red-400 p-1.5 transition rounded-lg hover:bg-red-500/10"
+                            title="Delete this brand profile"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -199,43 +236,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                     ))}
                   </div>
-                  <div className="pt-2">
+
+                  {/* Add Brand and Logout Actions */}
+                  <div className="pt-3 space-y-2">
                     <button
                       onClick={() => {
                         onAddNewProfile();
                         setShowSwitcher(false);
                       }}
-                      className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition border border-zinc-800"
+                      className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition border border-zinc-800"
                     >
-                      <Plus className="h-4 w-4 text-indigo-400" />
-                      <span>Add New Brand</span>
+                      <UserPlus className="h-4 w-4 text-indigo-400" />
+                      <span>Add Brand Profile</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        onLogOut();
+                        setShowSwitcher(false);
+                      }}
+                      className="w-full bg-red-950/20 hover:bg-red-950/40 text-red-400 hover:text-red-300 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition border border-red-900/30"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Log Out of Profile</span>
                     </button>
                   </div>
+
                 </div>
               )}
             </div>
+
           </div>
 
-          <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
-            <button
-              onClick={onEditProfile}
-              className="bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition border border-zinc-700"
-            >
-              <Settings className="h-4 w-4" />
-              <span>Settings</span>
-            </button>
-            <button
-              onClick={() => setShowModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg shadow-indigo-600/20"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Create Invoice</span>
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Stats Cards Grid (Responsive) */}
+      {/* Stats Section */}
       <div className="max-w-7xl mx-auto mt-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="glass-card p-5 rounded-xl border border-zinc-850 flex items-center space-x-4">
@@ -365,7 +401,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           {inv.paymentMode === 'Card' && <CreditCard className="h-3.5 w-3.5 text-zinc-500" />}
                           {inv.paymentMode === 'UPI' && <Sparkles className="h-3.5 w-3.5 text-zinc-500" />}
                           {inv.paymentMode === 'Bank Transfer' && <Landmark className="h-3.5 w-3.5 text-zinc-500" />}
-                          {inv.paymentMode === 'RTGS' && <Landmark className="h-3.5 w-3.5 text-zinc-500 animate-pulse" />}
+                          {inv.paymentMode === 'RTGS' && <Landmark className="h-3.5 w-3.5 text-zinc-500" />}
                           <span>{inv.paymentMode && inv.paymentMode !== 'None' ? inv.paymentMode : 'NILL'}</span>
                         </span>
                       </td>

@@ -163,7 +163,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       { label: 'GST State:', val: `${profile.stateName} (Code: ${profile.stateCode})`, bold: false },
     ];
 
-    // Optionally draw payment mode if chosen
     const showPaymentMode = invoice.paymentMode && invoice.paymentMode !== 'None';
     if (showPaymentMode) {
       invoiceInfo.push({ label: 'Payment Mode:', val: invoice.paymentMode, bold: false });
@@ -215,7 +214,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       thickness: 1,
     });
 
-    // Table Header (WITHOUT HSN)
+    // Table Header (WITH HSN)
     const tableHeaderY = height - 300;
     page.drawRectangle({
       x: 30,
@@ -225,10 +224,10 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       color: lightGray,
     });
 
-    // Re-mapped columns without HSN
     const columns = [
-      { name: 'Sr', x: 35, width: 25, align: 'left' },
-      { name: 'Description of Goods', x: 65, width: 220, align: 'left' },
+      { name: 'Sr', x: 35, width: 20, align: 'left' },
+      { name: 'Description of Goods', x: 60, width: 175, align: 'left' },
+      { name: 'HSN', x: 240, width: 45, align: 'left' },
       { name: 'Purity', x: 290, width: 75, align: 'left' },
       { name: 'Weight', x: 370, width: 55, align: 'right' },
       { name: 'Rate/g (₹)', x: 435, width: 55, align: 'right' },
@@ -257,13 +256,13 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     // Table rows
     let rowY = tableHeaderY - 20;
     invoice.items.forEach((item, index) => {
-      // Purity condition: Suppress if None, 0, or empty
       const isPurityNone = item.purityValue === 'None' || item.purityValue === '0' || item.purityValue.trim() === '';
       const purityDisplay = isPurityNone ? '' : `${item.purityValue} (${item.purityType === 'Karat' ? 'K' : '%'})`;
 
       const rowData = [
-        { val: (index + 1).toString(), x: 35, width: 25, align: 'left' },
-        { val: `${item.metal} - ${item.itemName}`, x: 65, width: 220, align: 'left' },
+        { val: (index + 1).toString(), x: 35, width: 20, align: 'left' },
+        { val: `${item.metal} - ${item.itemName}`, x: 60, width: 175, align: 'left' },
+        { val: item.hsn, x: 240, width: 45, align: 'left' },
         { val: purityDisplay, x: 290, width: 75, align: 'left' },
         { val: `${item.weight} ${item.weightUnit}`, x: 370, width: 55, align: 'right' },
         { val: item.ratePerGram.toFixed(2), x: 435, width: 55, align: 'right' },
@@ -285,7 +284,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     });
 
     // Grid vertical lines
-    const vLines = [30, 60, 285, 365, 425, 490, width - 30];
+    const vLines = [30, 55, 235, 285, 365, 425, 490, width - 30];
     vLines.forEach((x) => {
       page.drawLine({
         start: { x, y: tableHeaderY + 13 },
