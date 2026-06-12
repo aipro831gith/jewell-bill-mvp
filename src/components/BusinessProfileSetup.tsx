@@ -49,30 +49,40 @@ interface BusinessProfileSetupProps {
 }
 
 export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSetupComplete, initialData, onCancel }) => {
-  const [formData, setFormData] = useState<Partial<BusinessProfile>>(initialData || {
-    brandName: '',
-    legalName: '',
-    tagline: '',
-    estdYear: new Date().getFullYear(),
-    taxInvoicePrefix: 'SNJ',
-    challanPrefix: 'DC',
-    logoData: '',
-    gstin: '',
-    pan: '',
-    stateName: '',
-    stateCode: '',
-    address: '',
-    city: '',
-    phone: '',
-    email: '',
-    jurisdiction: 'Kolkata',
-    bankName: '',
-    branch: '',
-    accountName: '',
-    accountNo: '',
-    ifsc: '',
-    upiId: '',
-    qrCodeData: ''
+  const [formData, setFormData] = useState<Partial<BusinessProfile>>(() => {
+    if (initialData) {
+      const copy = { ...initialData };
+      if (!copy.templateId) {
+        copy.templateId = 1;
+      }
+      return copy;
+    }
+    return {
+      brandName: '',
+      legalName: '',
+      tagline: '',
+      estdYear: new Date().getFullYear(),
+      taxInvoicePrefix: 'SNJ',
+      challanPrefix: 'DC',
+      logoData: '',
+      gstin: '',
+      pan: '',
+      stateName: '',
+      stateCode: '',
+      address: '',
+      city: '',
+      phone: '',
+      email: '',
+      jurisdiction: 'Kolkata',
+      templateId: 1,
+      bankName: '',
+      branch: '',
+      accountName: '',
+      accountNo: '',
+      ifsc: '',
+      upiId: '',
+      qrCodeData: ''
+    };
   });
 
   const [compressingLogo, setCompressingLogo] = useState(false);
@@ -319,6 +329,72 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* PDF Design Template Section */}
+          <div className="bg-zinc-900/30 p-6 rounded-xl border border-zinc-800">
+            <div className="flex items-center space-x-2 mb-4 text-indigo-400">
+              <Sparkles className="h-5 w-5" />
+              <h2 className="text-base font-semibold text-zinc-200">Invoice PDF Design Theme</h2>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4">
+              Select the color theme and background style that will be used automatically when printing PDF copies.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, templateId: 1 }))}
+                className={`p-4 rounded-xl border text-left transition duration-200 ${
+                  formData.templateId === 1
+                    ? 'bg-indigo-600/10 border-indigo-500 ring-2 ring-indigo-500/20'
+                    : 'bg-zinc-950/40 border-zinc-850 hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-indigo-400">Classic Indigo</span>
+                  <div className="w-4 h-4 rounded-full bg-indigo-600"></div>
+                </div>
+                <p className="text-[10px] text-zinc-500">
+                  Modern corporate style with deep indigo headers, clean gray borders and high contrast.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, templateId: 2 }))}
+                className={`p-4 rounded-xl border text-left transition duration-200 ${
+                  formData.templateId === 2
+                    ? 'bg-rose-500/10 border-rose-500 ring-2 ring-rose-500/20'
+                    : 'bg-zinc-950/40 border-zinc-850 hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-rose-400">Elegant Crimson</span>
+                  <div className="w-4 h-4 rounded-full bg-rose-600"></div>
+                </div>
+                <p className="text-[10px] text-zinc-500">
+                  Sophisticated crimson accents, subtle pinkish tints and a professional aesthetic.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, templateId: 3 }))}
+                className={`p-4 rounded-xl border text-left transition duration-200 ${
+                  formData.templateId === 3
+                    ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20'
+                    : 'bg-zinc-950/40 border-zinc-850 hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-amber-400">Luxurious Gold</span>
+                  <div className="w-4 h-4 rounded-full bg-amber-500"></div>
+                </div>
+                <p className="text-[10px] text-zinc-500">
+                  Exquisite warm gold borders, dark charcoal titles and cream/beige table fills.
+                </p>
+              </button>
             </div>
           </div>
 

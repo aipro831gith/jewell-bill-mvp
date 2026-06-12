@@ -4,6 +4,7 @@ import type { BusinessProfile, Invoice } from './db/database';
 import { BusinessProfileSetup } from './components/BusinessProfileSetup';
 import { Dashboard } from './components/Dashboard';
 import { BillingScreen } from './components/BillingScreen';
+import { ProfileSelection } from './components/ProfileSelection';
 import { Loader2 } from 'lucide-react';
 
 function App() {
@@ -11,11 +12,10 @@ function App() {
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [profiles, setProfiles] = useState<BusinessProfile[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [screen, setScreen] = useState<'DASHBOARD' | 'SETUP' | 'BILLING'>('DASHBOARD');
+  const [screen, setScreen] = useState<'DASHBOARD' | 'SETUP' | 'BILLING' | 'PROFILE_SELECTION'>('DASHBOARD');
   
   // Billing specific states
   const [activeBillType, setActiveBillType] = useState<'TAX_INVOICE' | 'DELIVERY_CHALLAN'>('TAX_INVOICE');
-  const [selectedTemplate, setSelectedTemplate] = useState<1 | 2 | 3>(1);
 
   // Load database information on mount
   const refreshData = async () => {
@@ -30,6 +30,8 @@ function App() {
       
       if (allProfiles.length === 0) {
         setScreen('SETUP');
+      } else if (!active) {
+        setScreen('PROFILE_SELECTION');
       } else {
         setScreen('DASHBOARD');
       }
@@ -53,9 +55,8 @@ function App() {
     refreshData();
   };
 
-  const handleNewBill = (type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN', templateId: 1 | 2 | 3) => {
+  const handleNewBill = (type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN') => {
     setActiveBillType(type);
-    setSelectedTemplate(templateId);
     setScreen('BILLING');
   };
 
@@ -69,6 +70,7 @@ function App() {
     const matched = profiles.find((p) => p.id === id);
     if (matched) {
       setProfile(matched);
+      setScreen('DASHBOARD');
     }
     const allInvoices = await getAllInvoices();
     setInvoices(allInvoices);
@@ -79,8 +81,9 @@ function App() {
     const updatedProfiles = profiles.filter((p) => p.id !== id);
     setProfiles(updatedProfiles);
     
-    if (updatedProfiles.length > 0 && updatedProfiles[0].id !== undefined) {
-      handleSwitchProfile(updatedProfiles[0].id);
+    if (updatedProfiles.length > 0) {
+      setProfile(null);
+      setScreen('PROFILE_SELECTION');
     } else {
       setProfile(null);
       setScreen('SETUP');
@@ -90,7 +93,7 @@ function App() {
   const handleLogOut = () => {
     localStorage.removeItem('activeProfileId');
     setProfile(null);
-    setScreen('SETUP');
+    setScreen('PROFILE_SELECTION');
   };
 
   if (loading) {
@@ -108,7 +111,19 @@ function App() {
         <BusinessProfileSetup
           onSetupComplete={handleSetupComplete}
           initialData={profile}
-          onCancel={profiles.length > 0 ? () => setScreen('DASHBOARD') : undefined}
+          onCancel={profiles.length > 0 ? () => (profile ? setScreen('DASHBOARD') : setScreen('PROFILE_SELECTION')) : undefined}
+        />
+      )}
+
+      {screen === 'PROFILE_SELECTION' && (
+        <ProfileSelection
+          profiles={profiles}
+          onSelectProfile={handleSwitchProfile}
+          onAddNewProfile={() => {
+            setProfile(null);
+            setScreen('SETUP');
+          }}
+          onDeleteProfile={handleDeleteProfile}
         />
       )}
 
@@ -133,7 +148,6 @@ function App() {
         <BillingScreen
           profile={profile}
           type={activeBillType}
-          templateId={selectedTemplate}
           onBack={() => setScreen('DASHBOARD')}
           onSaveSuccess={handleSaveSuccess}
         />

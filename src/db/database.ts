@@ -19,6 +19,7 @@ export interface BusinessProfile {
   phone: string;
   email: string;
   jurisdiction: string;
+  templateId: 1 | 2 | 3; // Selected PDF Design template (Classic, Elegant, Gold)
   bankName?: string;
   branch?: string;
   accountName?: string;
@@ -150,7 +151,6 @@ export async function getActiveProfile(): Promise<BusinessProfile | null> {
   const profiles = await db.getAll('BusinessProfiles');
   if (profiles.length === 0) return null;
   
-  // Use localStorage to remember switched profile
   const storedIdStr = localStorage.getItem('activeProfileId');
   if (storedIdStr) {
     const storedId = parseInt(storedIdStr, 10);
@@ -158,7 +158,6 @@ export async function getActiveProfile(): Promise<BusinessProfile | null> {
     if (matched) return matched;
   }
   
-  // Fallback to first profile
   return profiles[0];
 }
 
@@ -178,7 +177,6 @@ export async function deleteProfile(id: number): Promise<void> {
   const db = await getDB();
   await db.delete('BusinessProfiles', id);
   
-  // Clean active profile selector if deleted
   const storedIdStr = localStorage.getItem('activeProfileId');
   if (storedIdStr && parseInt(storedIdStr, 10) === id) {
     localStorage.removeItem('activeProfileId');

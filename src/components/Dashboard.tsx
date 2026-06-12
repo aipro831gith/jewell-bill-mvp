@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Invoice, BusinessProfile } from '../db/database';
-import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, Trash2, ShieldCheck, LogOut, UserPlus } from 'lucide-react';
+import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, Trash2, LogOut, UserPlus } from 'lucide-react';
 import { generateAndDownloadPDF } from '../utils/pdfGenerator';
 
 interface DashboardProps {
   profile: BusinessProfile;
   profiles: BusinessProfile[];
   invoices: Invoice[];
-  onNewBill: (type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN', templateId: 1 | 2 | 3) => void;
+  onNewBill: (type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN') => void;
   onEditProfile: () => void;
   onAddNewProfile: () => void;
   onSwitchProfile: (id: number) => void;
@@ -29,7 +29,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'TAX_INVOICE' | 'DELIVERY_CHALLAN'>('ALL');
   const [showModal, setShowModal] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<1 | 2 | 3>(1);
+
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   
   // Profile switcher popover state
@@ -439,61 +439,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <Plus className="h-7 w-7 transition-transform group-hover:rotate-90" />
       </button>
 
-      {/* Choose Invoice Type & Template Modal */}
+      {/* Choose Invoice Type Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass max-w-lg w-full rounded-2xl border border-zinc-800 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="glass max-w-md w-full rounded-2xl border border-zinc-800 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <h2 className="text-lg font-bold text-white font-outfit mb-2">Create New Document</h2>
             <p className="text-xs text-zinc-400 mb-6">
-              Configure template styling and document type before proceeding.
+              Choose the document type to generate. Theme styling will apply automatically based on your active brand profile.
             </p>
-
-            {/* Template Selector Options */}
-            <div className="mb-6">
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Choose Design Template</label>
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  onClick={() => setSelectedTemplate(1)}
-                  className={`p-3 rounded-lg border text-xs font-semibold flex flex-col items-center justify-center text-center transition ${
-                    selectedTemplate === 1
-                      ? 'bg-indigo-600/10 border-indigo-500 text-indigo-400 font-bold'
-                      : 'bg-zinc-900 border-zinc-850 text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <ShieldCheck className="h-5 w-5 mb-1 text-indigo-500" />
-                  <span>Classic Indigo</span>
-                </button>
-                <button
-                  onClick={() => setSelectedTemplate(2)}
-                  className={`p-3 rounded-lg border text-xs font-semibold flex flex-col items-center justify-center text-center transition ${
-                    selectedTemplate === 2
-                      ? 'bg-rose-500/10 border-rose-500 text-rose-400 font-bold'
-                      : 'bg-zinc-900 border-zinc-850 text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <FileText className="h-5 w-5 mb-1 text-rose-500" />
-                  <span>Elegant Crimson</span>
-                </button>
-                <button
-                  onClick={() => setSelectedTemplate(3)}
-                  className={`p-3 rounded-lg border text-xs font-semibold flex flex-col items-center justify-center text-center transition ${
-                    selectedTemplate === 3
-                      ? 'bg-amber-500/10 border-amber-500 text-amber-400 font-bold'
-                      : 'bg-zinc-900 border-zinc-850 text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <Sparkles className="h-5 w-5 mb-1 text-amber-500" />
-                  <span>Luxurious Gold</span>
-                </button>
-              </div>
-            </div>
 
             {/* Document Type buttons */}
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={() => {
                   setShowModal(false);
-                  onNewBill('TAX_INVOICE', selectedTemplate);
+                  onNewBill('TAX_INVOICE');
                 }}
                 className="bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-emerald-500 p-6 rounded-xl flex flex-col items-center justify-center text-center transition group"
               >
@@ -507,7 +467,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <button
                 onClick={() => {
                   setShowModal(false);
-                  onNewBill('DELIVERY_CHALLAN', selectedTemplate);
+                  onNewBill('DELIVERY_CHALLAN');
                 }}
                 className="bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-amber-500 p-6 rounded-xl flex flex-col items-center justify-center text-center transition group"
               >

@@ -10,21 +10,19 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
   const numPages = 3;
   const isChallan = invoice.type === 'DELIVERY_CHALLAN';
 
-  // Format date
   const invoiceDateStr = new Date(invoice.date).toLocaleDateString('en-IN', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   });
 
-  // Fetch template ID: 1, 2, or 3
-  const templateId = invoice.templateId || 1;
+  // Inherit templateId from invoice or profile fallback
+  const templateId = invoice.templateId || profile.templateId || 1;
 
   for (let i = 1; i <= numPages; i++) {
     const page = pdfDoc.addPage([595.27, 841.89]);
     const { width, height } = page.getSize();
 
-    // Copy label logic
     let copyLabel = '';
     if (isChallan) {
       if (i === 1) copyLabel = 'COPY 1: ORIGINAL FOR CONSIGNEE';
@@ -36,8 +34,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       else copyLabel = 'COPY 3: TRIPLICATE FOR SUPPLIER';
     }
 
-    // Color definitions based on Template ID
-    let primaryColor = rgb(0.08, 0.08, 0.12); // #15151f
+    let primaryColor = rgb(0.08, 0.08, 0.12);
     let accentColor = rgb(0.12, 0.12, 0.16);
     let borderGray = rgb(0.8, 0.8, 0.8);
     let lightGray = rgb(0.95, 0.95, 0.96);
@@ -45,20 +42,17 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     const textColor = rgb(0.15, 0.15, 0.18);
 
     if (templateId === 2) {
-      // Elegant Crimson Theme
-      primaryColor = rgb(0.53, 0.07, 0.22); // Wine red (#881337)
+      primaryColor = rgb(0.53, 0.07, 0.22);
       accentColor = rgb(0.7, 0.1, 0.3);
       borderGray = rgb(0.85, 0.75, 0.78);
       lightGray = rgb(0.98, 0.94, 0.95);
     } else if (templateId === 3) {
-      // Luxurious Gold Theme
-      primaryColor = rgb(0.05, 0.05, 0.05); // Charcoal black (#0c0c0c)
-      accentColor = rgb(0.76, 0.52, 0.1); // Warm gold (#c2851a)
-      borderGray = rgb(0.75, 0.65, 0.45); // Light gold-tinted gray
+      primaryColor = rgb(0.05, 0.05, 0.05);
+      accentColor = rgb(0.76, 0.52, 0.1);
+      borderGray = rgb(0.75, 0.65, 0.45);
       lightGray = rgb(0.97, 0.96, 0.92);
     }
 
-    // Draw page outer border
     page.drawRectangle({
       x: 30,
       y: 30,
@@ -69,7 +63,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     });
 
     if (templateId === 1 || templateId === 3) {
-      // Draw colored top banner for Classic & Gold templates
       page.drawRectangle({
         x: 30,
         y: height - 65,
@@ -78,7 +71,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
         color: primaryColor,
       });
 
-      // Gold template top border accent
       if (templateId === 3) {
         page.drawLine({
           start: { x: 30, y: height - 65 },
@@ -88,7 +80,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
         });
       }
 
-      // Title
       page.drawText(isChallan ? 'DELIVERY CHALLAN' : 'TAX INVOICE', {
         x: 45,
         y: height - 52,
@@ -97,7 +88,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
         color: rgb(1, 1, 1),
       });
 
-      // Copy Label
       page.drawText(copyLabel, {
         x: width - 250,
         y: height - 50,
@@ -106,7 +96,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
         color: rgb(1, 1, 1),
       });
     } else {
-      // Template 2 (Crimson): Clean and minimal bottom border line header (No banner block)
       page.drawLine({
         start: { x: 30, y: height - 65 },
         end: { x: width - 30, y: height - 65 },
@@ -131,7 +120,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       });
     }
 
-    // Profile details (Top Left)
     const brandName = profile.brandName.toUpperCase();
     const brandColor = (templateId === 2) ? primaryColor : (templateId === 3) ? accentColor : textColor;
     
@@ -139,7 +127,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     page.drawText(profile.legalName, { x: 45, y: height - 105, size: 9, font: helveticaFont, color: textColor });
     page.drawText(profile.tagline ? `"${profile.tagline}"` : '', { x: 45, y: height - 118, size: 8, font: helveticaFont, color: darkGray });
 
-    // Supplier address lines
     const addressLines = [
       profile.address,
       `${profile.city} - ${profile.stateName} (Code: ${profile.stateCode})`,
@@ -152,7 +139,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       profileY -= 12;
     });
 
-    // Invoice details (Top Right Box)
     const infoX = width - 240;
     let infoY = height - 90;
     
@@ -174,7 +160,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       infoY -= 14;
     });
 
-    // Separator line
     page.drawLine({
       start: { x: 30, y: height - 195 },
       end: { x: width - 30, y: height - 195 },
@@ -182,7 +167,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       thickness: 1,
     });
 
-    // Customer details
     const custY = height - 212;
     page.drawText(isChallan ? 'CONSIGNEE DETAILS:' : 'BILLED TO (RECIPIENT):', { x: 45, y: custY, size: 10, font: helveticaBold, color: (templateId === 2 || templateId === 3) ? primaryColor : textColor });
     
@@ -206,7 +190,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       lineY -= 12;
     });
 
-    // Separator line before item table
     page.drawLine({
       start: { x: 30, y: height - 285 },
       end: { x: width - 30, y: height - 285 },
@@ -214,7 +197,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       thickness: 1,
     });
 
-    // Table Header (WITH HSN)
     const tableHeaderY = height - 300;
     page.drawRectangle({
       x: 30,
@@ -245,7 +227,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       });
     });
 
-    // Divider under table header
     page.drawLine({
       start: { x: 30, y: tableHeaderY - 5 },
       end: { x: width - 30, y: tableHeaderY - 5 },
@@ -253,7 +234,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       thickness: 1,
     });
 
-    // Table rows
     let rowY = tableHeaderY - 20;
     invoice.items.forEach((item, index) => {
       const isPurityNone = item.purityValue === 'None' || item.purityValue === '0' || item.purityValue.trim() === '';
@@ -283,7 +263,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       rowY -= 15;
     });
 
-    // Grid vertical lines
     const vLines = [30, 55, 235, 285, 365, 425, 490, width - 30];
     vLines.forEach((x) => {
       page.drawLine({
@@ -294,7 +273,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       });
     });
 
-    // Divider line under last row
     page.drawLine({
       start: { x: 30, y: rowY + 10 },
       end: { x: width - 30, y: rowY + 10 },
@@ -302,7 +280,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       thickness: 1,
     });
 
-    // Summary Calculations Block
     let summaryY = rowY - 5;
     
     const drawSummaryRow = (label: string, valueStr: string, isBold: boolean = false) => {
@@ -331,14 +308,12 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     drawSummaryRow('Total Gold/Silver Weight:', totalWeightStr, false);
     drawSummaryRow('Subtotal Taxable Amount:', totalTaxableStr, false);
 
-    // Hide discount row dynamically if it is 0
     if (invoice.discountApplied > 0) {
       drawSummaryRow('Discount Applied (Less):', `-₹${invoice.discountApplied.toFixed(2)}`, false);
       const afterDiscount = (invoice.items.reduce((sum, item) => sum + item.taxableAmount, 0) - invoice.discountApplied);
       drawSummaryRow('Net Taxable Subtotal:', `₹${afterDiscount.toFixed(2)}`, false);
     }
 
-    // CGST/SGST or IGST rows
     if (invoice.taxDetails.cgst > 0 || invoice.taxDetails.sgst > 0) {
       drawSummaryRow(`CGST (${invoice.taxDetails.cgstPercent}%):`, `₹${invoice.taxDetails.cgst.toFixed(2)}`, false);
       drawSummaryRow(`SGST (${invoice.taxDetails.sgstPercent}%):`, `₹${invoice.taxDetails.sgst.toFixed(2)}`, false);
@@ -346,11 +321,9 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       drawSummaryRow(`IGST (${invoice.taxDetails.igstPercent}%):`, `₹${invoice.taxDetails.igst.toFixed(2)}`, false);
     }
 
-    // Grand Total and Payable
     drawSummaryRow('Grand Total (with Tax):', `₹${invoice.grandTotal.toFixed(2)}`, false);
     drawSummaryRow('Rounded Payable Amount:', `₹${invoice.payableAmount.toFixed(2)}`, true);
 
-    // Bank details (Skip dynamically if empty)
     const hasBank = profile.bankName && profile.bankName.trim() !== '';
     const hasUpi = profile.upiId && profile.upiId.trim() !== '';
     
@@ -386,16 +359,14 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       }
     }
 
-    // Terms / Signatures
     const termsY = 55;
     page.drawText('Terms & Conditions:', { x: 40, y: termsY + 12, size: 8, font: helveticaBold, color: textColor });
     page.drawText('1. Goods once sold will not be taken back.', { x: 40, y: termsY, size: 7, font: helveticaFont, color: darkGray });
     page.drawText('2. We declare that this invoice shows the actual price of the goods described.', { x: 40, y: termsY - 8, size: 7, font: helveticaFont, color: darkGray });
 
-    // E&OE
     page.drawText('E&OE', { x: 40, y: termsY - 20, size: 8, font: helveticaBold, color: textColor });
 
-    // Jurisdiction Footer
+    // Dynamic Jurisdiction Footer
     const jurLabel = `SUBJECT TO ${profile.jurisdiction.toUpperCase()} JURISDICTION`;
     page.drawText(jurLabel, {
       x: width - 40 - helveticaBold.widthOfTextAtSize(jurLabel, 7.5),
@@ -405,7 +376,6 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
       color: textColor,
     });
 
-    // Signatures
     const sigY = 90;
     const sigLabel = `For ${profile.legalName.toUpperCase()}`;
     page.drawText(sigLabel, {
@@ -434,7 +404,8 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
 
   const pdfBytes = await pdfDoc.save();
 
-  const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+  // FIX: Cast pdfBytes to any to avoid type check errors while ensuring correct browser blob compilation
+  const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

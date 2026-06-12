@@ -9,7 +9,6 @@ import { ArrowLeft, User, Plus, Trash2, ShieldAlert, Sparkles, FileText, Loader2
 interface BillingScreenProps {
   profile: BusinessProfile;
   type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN';
-  templateId: 1 | 2 | 3;
   onBack: () => void;
   onSaveSuccess: () => void;
 }
@@ -17,11 +16,17 @@ interface BillingScreenProps {
 export const BillingScreen: React.FC<BillingScreenProps> = ({
   profile,
   type,
-  templateId,
   onBack,
   onSaveSuccess,
 }) => {
+  const templateId = profile.templateId || 1;
   const [invoiceId, setInvoiceId] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(() => {
+    const local = new Date();
+    const offset = local.getTimezoneOffset();
+    const adjusted = new Date(local.getTime(), -offset * 60 * 1000);
+    return adjusted.toISOString().split('T')[0];
+  });
   
   // Customer details
   const [customerDetails, setCustomerDetails] = useState({
@@ -262,7 +267,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         invoiceId,
         type,
         templateId,
-        date: Date.now(),
+        date: new Date(invoiceDate).getTime(),
         profileId: profile.id || 1,
         customerDetails: {
           partyName: customerDetails.partyName,
@@ -326,6 +331,41 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         
         {/* Left Side: Customer Info & Item Grid */}
         <div className="lg:col-span-2 space-y-6">
+
+          {/* Document Reference & Date Selection */}
+          <div className="glass p-5 rounded-2xl border border-zinc-800 shadow-xl">
+            <div className="flex items-center space-x-2 mb-4 text-indigo-400">
+              <FileText className="h-5 w-5" />
+              <h2 className="text-sm font-bold text-zinc-200 uppercase tracking-wide">Document Reference & Date</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
+                  {type === 'TAX_INVOICE' ? 'Invoice Number *' : 'Challan Number *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. SNJ/INV/26-27/001"
+                  value={invoiceId}
+                  onChange={(e) => setInvoiceId(e.target.value)}
+                  className="w-full bg-zinc-950/60 border border-zinc-855 rounded-lg px-3 py-2 text-xs text-white font-bold font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
+                  Billing Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                  className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
           
           {/* Customer Card */}
           <div className="glass p-5 rounded-2xl border border-zinc-800 shadow-xl">
