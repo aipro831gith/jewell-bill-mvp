@@ -1,0 +1,17 @@
+{
+  "name": "Sri Narayan Jewellers Billing MVP",
+  "short_name": "SNJ Billing",
+  "description": "Offline-First GST Billing and Invoice PWA for Sri Narayan Jewellers",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#1e1b4b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
