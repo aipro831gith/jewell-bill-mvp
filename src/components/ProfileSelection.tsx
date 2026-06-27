@@ -104,12 +104,9 @@ export const ProfileSelection: React.FC<ProfileSelectionProps> = ({
 
                 {profile.templateId && (
                   <span className={`text-[8px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded mt-1.5 ${
-                    profile.templateId === 1 ? 'bg-indigo-650/15 text-indigo-400' :
-                    profile.templateId === 2 ? 'bg-rose-650/15 text-rose-400' :
-                    'bg-amber-650/15 text-amber-400'
+                    profile.templateId === 1 ? 'bg-indigo-650/15 text-indigo-400' : 'bg-rose-650/15 text-rose-400'
                   }`}>
-                    {profile.templateId === 1 ? 'Indigo' :
-                     profile.templateId === 2 ? 'Crimson' : 'Gold'} Theme
+                    Template {profile.templateId}
                   </span>
                 )}
               </div>
