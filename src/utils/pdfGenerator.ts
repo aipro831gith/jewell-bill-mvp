@@ -347,8 +347,8 @@ async function renderTemplate2(
   const emailTxt = invoice.isSwappedAddress ? '' : profile.email;
   const addrTxt = invoice.isSwappedAddress ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}, ${invoice.customerDetails.stateName}-${invoice.customerDetails.stateCode}` : `${profile.address}, ${profile.city}, ${profile.stateName}-${profile.stateCode}`;
   
-  page.drawText(`•  ${addrTxt}`, { x: 90, y: y(86), size: 7, font: bold, color: darkBlue });
-  page.drawText(`☎  ${phoneTxt}    ✉  ${emailTxt}`, { x: 90, y: y(98), size: 7, font: bold, color: darkBlue });
+  page.drawText(`-  ${addrTxt}`, { x: 90, y: y(86), size: 7, font: bold, color: darkBlue });
+  page.drawText(`Ph: ${phoneTxt}    Email: ${emailTxt}`, { x: 90, y: y(98), size: 7, font: bold, color: darkBlue });
 
   // Right: Tax Invoice Title & Blue Box
   const title = isChallan ? 'DELIVERY CHALLAN' : 'TAX INVOICE';
@@ -525,7 +525,7 @@ async function renderTemplate2(
   const bankY = totY - 135;
   page.drawRectangle({ x: 30, y: bankY - 15, width: width - 60, height: 15, color: darkBlue });
   const bdW2 = font.widthOfTextAtSize('BANK DETAILS', 8);
-  page.drawText('◆ BANK DETAILS', { x: (width - bdW2 - 15)/2, y: bankY - 10, size: 8, font: font, color: yellowCol });
+  page.drawText('* BANK DETAILS', { x: (width - bdW2 - 15)/2, y: bankY - 10, size: 8, font: font, color: yellowCol });
   
   page.drawRectangle({ x: 30, y: bankY - 105, width: width - 60, height: 90, borderColor: darkBlue, borderWidth: 1 });
   let bdy = bankY - 35;
@@ -543,7 +543,7 @@ async function renderTemplate2(
 
   // Footer text
   const footY = bankY - 130;
-  page.drawText('— SUBJECT TO KOLKATA JURISDICTION —', { x: 30, y: footY, size: 7, font: oblique, color: rgb(0,0,0) });
+  page.drawText('- SUBJECT TO KOLKATA JURISDICTION -', { x: 30, y: footY, size: 7, font: oblique, color: rgb(0,0,0) });
   page.drawText('E&OE', { x: 30, y: footY - 12, size: 7, font: font, color: rgb(0,0,0) });
 
   const fsRight = `FOR ${brandName}`;
@@ -563,5 +563,5 @@ async function renderTemplate2(
   page.drawText(trustTxt, { x: width - 40 - font.widthOfTextAtSize(trustTxt, 7), y: botY + 7, size: 7, font: font, color: yellowCol });
   
   // Center diamond
-  page.drawText('◆', { x: (width - 10)/2, y: botY + 7, size: 8, font: font, color: yellowCol });
+  page.drawText('*', { x: (width - 10)/2, y: botY + 7, size: 8, font: font, color: yellowCol });
 }
