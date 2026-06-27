@@ -339,62 +339,102 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
               <h2 className="text-base font-semibold text-zinc-200">Invoice PDF Design Theme</h2>
             </div>
             <p className="text-xs text-zinc-400 mb-4">
-              Select the color theme and background style that will be used automatically when printing PDF copies.
+              Select the invoice layout that will be used automatically when printing PDF copies. This layout is permanently linked to your profile until changed.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Template 1 (G Agarwal Chain Replica) */}
               <button
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, templateId: 1 }))}
-                className={`p-4 rounded-xl border text-left transition duration-200 ${
+                className={`rounded-xl border text-left overflow-hidden transition duration-200 group ${
                   formData.templateId === 1
-                    ? 'bg-indigo-600/10 border-indigo-500 ring-2 ring-indigo-500/20'
-                    : 'bg-zinc-950/40 border-zinc-850 hover:border-zinc-700'
+                    ? 'border-indigo-500 ring-2 ring-indigo-500/50 shadow-lg shadow-indigo-500/20'
+                    : 'border-zinc-800 hover:border-zinc-600'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-indigo-400">Classic Indigo</span>
-                  <div className="w-4 h-4 rounded-full bg-indigo-600"></div>
+                <div className="bg-white p-4 h-48 flex flex-col items-center justify-start border-b border-zinc-800 group-hover:opacity-90">
+                  <div className="w-full flex justify-between px-2 mb-2">
+                    <div className="h-1 w-12 bg-zinc-300"></div>
+                    <div className="h-1.5 w-16 bg-zinc-800 rounded"></div>
+                    <div className="h-1 w-12 bg-zinc-300"></div>
+                  </div>
+                  <div className="h-4 w-4 bg-green-500 rounded-full mb-1"></div>
+                  <div className="h-2 w-32 bg-green-600 mb-2"></div>
+                  <div className="w-full border border-zinc-300 p-2 flex mb-2">
+                     <div className="w-1/2 h-4 border-r border-zinc-300"></div>
+                     <div className="w-1/2 h-4"></div>
+                  </div>
+                  <div className="w-full h-3 bg-purple-500 mb-1"></div>
+                  <div className="w-full h-8 border-x border-b border-zinc-300 mb-2 flex">
+                    <div className="w-1/4 h-full border-r border-zinc-300"></div>
+                    <div className="w-1/4 h-full border-r border-zinc-300"></div>
+                    <div className="w-1/4 h-full border-r border-zinc-300"></div>
+                    <div className="w-1/4 h-full"></div>
+                  </div>
+                  <div className="w-full flex justify-end space-y-0.5 flex-col items-end">
+                    <div className="w-1/3 h-1.5 bg-fuchsia-500"></div>
+                    <div className="w-1/3 h-1.5 bg-cyan-400"></div>
+                    <div className="w-1/3 h-1.5 bg-yellow-400"></div>
+                  </div>
                 </div>
-                <p className="text-[10px] text-zinc-500">
-                  Modern corporate style with deep indigo headers, clean gray borders and high contrast.
-                </p>
+                <div className={`p-4 ${formData.templateId === 1 ? 'bg-indigo-600/10' : 'bg-zinc-950/60'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-bold text-white">Template 1</span>
+                    <div className={`w-4 h-4 rounded-full ${formData.templateId === 1 ? 'bg-indigo-500' : 'bg-zinc-700'}`}></div>
+                  </div>
+                  <p className="text-[10px] text-zinc-400">
+                    Centered layout with green branding, purple table headers, and vibrant multi-colored totals summary.
+                  </p>
+                </div>
               </button>
 
+              {/* Template 2 (Sri Narayan Jewellers Replica) */}
               <button
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, templateId: 2 }))}
-                className={`p-4 rounded-xl border text-left transition duration-200 ${
+                className={`rounded-xl border text-left overflow-hidden transition duration-200 group ${
                   formData.templateId === 2
-                    ? 'bg-rose-500/10 border-rose-500 ring-2 ring-rose-500/20'
-                    : 'bg-zinc-950/40 border-zinc-850 hover:border-zinc-700'
+                    ? 'border-indigo-500 ring-2 ring-indigo-500/50 shadow-lg shadow-indigo-500/20'
+                    : 'border-zinc-800 hover:border-zinc-600'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-rose-400">Elegant Crimson</span>
-                  <div className="w-4 h-4 rounded-full bg-rose-600"></div>
+                <div className="bg-white p-4 h-48 flex flex-col items-start justify-start border-b border-zinc-800 group-hover:opacity-90">
+                  <div className="w-full flex justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                       <div className="h-6 w-6 bg-blue-900 rounded-full"></div>
+                       <div className="h-2 w-20 bg-blue-900"></div>
+                    </div>
+                    <div className="h-4 w-16 bg-blue-900"></div>
+                  </div>
+                  <div className="w-full h-3 bg-blue-900 mb-1"></div>
+                  <div className="w-full h-6 border-x border-b border-blue-900 mb-3 flex"></div>
+                  
+                  <div className="w-full h-3 bg-blue-900 flex justify-between px-1 mb-1 items-center">
+                     <div className="h-1 w-4 bg-yellow-400"></div>
+                     <div className="h-1 w-4 bg-yellow-400"></div>
+                     <div className="h-1 w-4 bg-yellow-400"></div>
+                  </div>
+                  <div className="w-full h-8 border-x border-b border-zinc-300 mb-2"></div>
+                  <div className="w-full flex justify-between">
+                     <div className="w-1/3 h-4 bg-zinc-200"></div>
+                     <div className="w-1/3 h-8 border border-zinc-300 flex flex-col justify-end">
+                       <div className="w-full h-2 bg-blue-900"></div>
+                       <div className="w-full h-2 bg-yellow-400"></div>
+                     </div>
+                  </div>
                 </div>
-                <p className="text-[10px] text-zinc-500">
-                  Sophisticated crimson accents, subtle pinkish tints and a professional aesthetic.
-                </p>
+                <div className={`p-4 ${formData.templateId === 2 ? 'bg-indigo-600/10' : 'bg-zinc-950/60'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-bold text-white">Template 2</span>
+                    <div className={`w-4 h-4 rounded-full ${formData.templateId === 2 ? 'bg-indigo-500' : 'bg-zinc-700'}`}></div>
+                  </div>
+                  <p className="text-[10px] text-zinc-400">
+                    Left-aligned dark blue branding with yellow accents, boxed buyer details, and diamond-studded footers.
+                  </p>
+                </div>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, templateId: 3 }))}
-                className={`p-4 rounded-xl border text-left transition duration-200 ${
-                  formData.templateId === 3
-                    ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20'
-                    : 'bg-zinc-950/40 border-zinc-850 hover:border-zinc-700'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-amber-400">Luxurious Gold</span>
-                  <div className="w-4 h-4 rounded-full bg-amber-500"></div>
-                </div>
-                <p className="text-[10px] text-zinc-500">
-                  Exquisite warm gold borders, dark charcoal titles and cream/beige table fills.
-                </p>
-              </button>
             </div>
           </div>
 

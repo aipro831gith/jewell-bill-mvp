@@ -19,7 +19,7 @@ export interface BusinessProfile {
   phone: string;
   email: string;
   jurisdiction: string;
-  templateId: 1 | 2 | 3; // Selected PDF Design template (Classic, Elegant, Gold)
+  templateId: 1 | 2; // Selected PDF Design template
   bankName?: string;
   branch?: string;
   accountName?: string;
@@ -60,7 +60,7 @@ export interface Invoice {
   type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN';
   date: number; // timestamp
   profileId: number;
-  templateId: 1 | 2 | 3; // Selected PDF Design template
+  templateId: 1 | 2; // Selected PDF Design template
   customerDetails: {
     partyName: string;
     phone: string;

@@ -61,8 +61,6 @@ export const ProfileSelection: React.FC<ProfileSelectionProps> = ({
             let themeColorClass = 'group-hover:border-indigo-500 shadow-indigo-500/10';
             if (profile.templateId === 2) {
               themeColorClass = 'group-hover:border-rose-500 shadow-rose-500/10';
-            } else if (profile.templateId === 3) {
-              themeColorClass = 'group-hover:border-amber-500 shadow-amber-500/10';
             }
 
             return (
