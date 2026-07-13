@@ -1,12 +1,9 @@
 const CACHE_NAME = 'snj-billing-v1';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/index.css',
-  '/src/App.tsx',
-  '/manifest.json',
-  '/favicon.svg'
+  './',
+  './index.html',
+  './manifest.json',
+  './favicon.svg'
 ];
 
 self.addEventListener('install', (e) => {
