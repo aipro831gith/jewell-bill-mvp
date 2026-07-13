@@ -16,6 +16,7 @@ export interface BusinessProfile {
   stateCode: string;
   address: string;
   city: string;
+  zipCode?: string;
   phone: string;
   email: string;
   jurisdiction: string;
@@ -36,6 +37,7 @@ export interface Customer {
   phone: string;
   address: string;
   city: string;
+  zipCode?: string;
   stateName: string;
   stateCode: string;
   gstin: string;
@@ -44,6 +46,7 @@ export interface Customer {
   idType?: 'PAN' | 'AADHAAR';
   shippingAddress?: string;
   shippingCity?: string;
+  shippingZipCode?: string;
   shippingStateName?: string;
   shippingStateCode?: string;
 }
@@ -73,6 +76,7 @@ export interface Invoice {
     phone: string;
     address: string;
     city: string;
+    zipCode?: string;
     stateName: string;
     stateCode: string;
     gstin: string;
@@ -80,8 +84,10 @@ export interface Invoice {
     idType: 'PAN' | 'AADHAAR';
     shippingAddress?: string;
     shippingCity?: string;
+    shippingZipCode?: string;
     shippingStateName?: string;
     shippingStateCode?: string;
+    phonePrefix?: string;
   };
   items: InvoiceItem[];
   taxDetails: {
@@ -246,10 +252,18 @@ export async function saveInvoice(invoice: Invoice): Promise<string> {
     phone: invoice.customerDetails.phone.replace(/^\+\d+\s/, ''), // strip prefix
     address: invoice.customerDetails.address,
     city: invoice.customerDetails.city,
+    zipCode: invoice.customerDetails.zipCode,
     stateName: invoice.customerDetails.stateName,
     stateCode: invoice.customerDetails.stateCode,
     gstin: invoice.customerDetails.gstin,
     panAadhaar: invoice.customerDetails.panAadhaar,
+    phonePrefix: invoice.customerDetails.phonePrefix,
+    idType: invoice.customerDetails.idType,
+    shippingAddress: invoice.customerDetails.shippingAddress,
+    shippingCity: invoice.customerDetails.shippingCity,
+    shippingZipCode: invoice.customerDetails.shippingZipCode,
+    shippingStateName: invoice.customerDetails.shippingStateName,
+    shippingStateCode: invoice.customerDetails.shippingStateCode,
   };
   
   if (customerToSave.partyName !== 'NILL') {

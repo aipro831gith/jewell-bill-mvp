@@ -164,7 +164,11 @@ async function renderTemplate1(
   const brandW = bold.widthOfTextAtSize(brandName, 14.5);
   page.drawText(brandName, { x: (width - brandW) / 2, y: y(50.7), size: 14.5, font: bold, color: colors.text });
   
-  const addressText = invoice.isSwappedAddress ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}` : `${profile.address}, ${profile.city}`;
+  const profileZip = profile.zipCode ? ` - ${profile.zipCode}` : '';
+  const custZip = invoice.customerDetails.zipCode ? ` - ${invoice.customerDetails.zipCode}` : '';
+  const addressText = invoice.isSwappedAddress 
+    ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}${custZip}` 
+    : `${profile.address}, ${profile.city}${profileZip}`;
   const addressW = oblique.widthOfTextAtSize(addressText, 9.5);
   page.drawText(addressText, { x: (width - addressW) / 2, y: y(57.2), size: 9.5, font: oblique, color: colors.text });
 
@@ -188,7 +192,9 @@ async function renderTemplate1(
 
   const rName = invoice.isSwappedAddress ? profile.legalName : invoice.customerDetails.partyName;
   const rAddress = invoice.isSwappedAddress ? profile.address : invoice.customerDetails.address;
-  const rCity = invoice.isSwappedAddress ? profile.city : invoice.customerDetails.city;
+  const rCityRaw = invoice.isSwappedAddress ? profile.city : invoice.customerDetails.city;
+  const rZip = invoice.isSwappedAddress ? profile.zipCode : invoice.customerDetails.zipCode;
+  const rCity = rZip ? `${rCityRaw} - ${rZip}` : rCityRaw;
   const rPhone = invoice.isSwappedAddress ? profile.phone : invoice.customerDetails.phone;
   const rGstin = invoice.isSwappedAddress ? profile.gstin : invoice.customerDetails.gstin;
   const rPan = invoice.isSwappedAddress ? profile.pan : invoice.customerDetails.panAadhaar;
@@ -199,8 +205,9 @@ async function renderTemplate1(
   page.drawText(`NAME: ${rName}`, { x: x(40.9), y: y(79.8), size: 10, font: bold, color: colors.text });
   if (invoice.isShippingDifferent) {
     page.drawText(`BILL TO: ${rAddress}, ${rCity}`, { x: x(40.9), y: y(84.9), size: 9, font: bold, color: colors.text });
-    const sCity = invoice.customerDetails.shippingCity ? `, ${invoice.customerDetails.shippingCity}` : '';
-    page.drawText(`SHIP TO: ${invoice.customerDetails.shippingAddress}${sCity}`, { x: x(40.9), y: y(90.6), size: 9, font: bold, color: colors.text });
+    const sCityRaw = invoice.customerDetails.shippingCity ? `, ${invoice.customerDetails.shippingCity}` : '';
+    const sZip = invoice.customerDetails.shippingZipCode ? ` - ${invoice.customerDetails.shippingZipCode}` : '';
+    page.drawText(`SHIP TO: ${invoice.customerDetails.shippingAddress}${sCityRaw}${sZip}`, { x: x(40.9), y: y(90.6), size: 9, font: bold, color: colors.text });
   } else {
     page.drawText(`ADDRESS: ${rAddress}, ${rCity}`, { x: x(40.9), y: y(84.9), size: 9.5, font: bold, color: colors.text });
   }
@@ -407,7 +414,11 @@ async function renderTemplate2(
   page.drawText(tagStr, { x: x(33), y: y(19), size: 8, font: oblique, color: gold });
   page.drawText(`ESTD: ${profile.estdYear || '2020'}`, { x: x(33), y: y(22.5), size: 7.5, font: bold, color: gold });
   
-  const shopAddr = invoice.isSwappedAddress ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}` : `${profile.address}, ${profile.city}`;
+  const profileZip = profile.zipCode ? ` - ${profile.zipCode}` : '';
+  const custZip = invoice.customerDetails.zipCode ? ` - ${invoice.customerDetails.zipCode}` : '';
+  const shopAddr = invoice.isSwappedAddress 
+    ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}${custZip}` 
+    : `${profile.address}, ${profile.city}${profileZip}`;
   page.drawText(shopAddr, { x: x(33), y: y(27), size: 7.5, font: font, color: textDark });
   
   const shopContact = invoice.isSwappedAddress ? `PH: ${invoice.customerDetails.phone}` : `PH: ${profile.phone} | EMAIL: ${profile.email}`;
@@ -453,7 +464,9 @@ async function renderTemplate2(
   // Buyer details mapping
   const rName = invoice.isSwappedAddress ? profile.legalName : invoice.customerDetails.partyName;
   const rAddress = invoice.isSwappedAddress ? profile.address : invoice.customerDetails.address;
-  const rCity = invoice.isSwappedAddress ? profile.city : invoice.customerDetails.city;
+  const rCityRaw = invoice.isSwappedAddress ? profile.city : invoice.customerDetails.city;
+  const rZip = invoice.isSwappedAddress ? profile.zipCode : invoice.customerDetails.zipCode;
+  const rCity = rZip ? `${rCityRaw} - ${rZip}` : rCityRaw;
   const rState = invoice.isSwappedAddress ? profile.stateName : invoice.customerDetails.stateName;
   const rStateCode = invoice.isSwappedAddress ? profile.stateCode : invoice.customerDetails.stateCode;
   const rGstin = invoice.isSwappedAddress ? profile.gstin : invoice.customerDetails.gstin;
@@ -483,7 +496,10 @@ async function renderTemplate2(
     drawBL('GSTIN:', rGstin || 'NILL');
     drawBL(`${rIdType}:`, rPan || 'NILL');
 
-    drawBR('ADDRESS:', `${invoice.customerDetails.shippingAddress}, ${invoice.customerDetails.shippingCity}`);
+    const sCityRaw = invoice.customerDetails.shippingCity ? invoice.customerDetails.shippingCity : '';
+    const sZip = invoice.customerDetails.shippingZipCode ? ` - ${invoice.customerDetails.shippingZipCode}` : '';
+    const sCity = sZip ? `${sCityRaw}${sZip}` : sCityRaw;
+    drawBR('ADDRESS:', `${invoice.customerDetails.shippingAddress}, ${sCity}`);
     drawBR('STATE:', invoice.customerDetails.shippingStateName || 'NILL');
     drawBR('STATE CODE:', invoice.customerDetails.shippingStateCode || 'NILL');
     drawBR('POS:', rPos || 'NILL');

@@ -41,6 +41,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       phone: '',
       address: '',
       city: '',
+      zipCode: '',
       stateName: profile.stateName,
       stateCode: profile.stateCode,
       idType: 'PAN',
@@ -48,6 +49,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       gstin: '',
       shippingAddress: '',
       shippingCity: '',
+      shippingZipCode: '',
       shippingStateName: '',
       shippingStateCode: ''
     });
@@ -84,6 +86,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         phone: initialCustomer.phone,
         address: initialCustomer.address || '',
         city: initialCustomer.city || '',
+        zipCode: initialCustomer.zipCode || '',
         stateName: initialCustomer.stateName || profile.stateName,
         stateCode: initialCustomer.stateCode || profile.stateCode,
         idType: initialCustomer.idType || 'PAN',
@@ -91,6 +94,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         gstin: initialCustomer.gstin || '',
         shippingAddress: initialCustomer.shippingAddress || '',
         shippingCity: initialCustomer.shippingCity || '',
+        shippingZipCode: initialCustomer.shippingZipCode || '',
         shippingStateName: initialCustomer.shippingStateName || '',
         shippingStateCode: initialCustomer.shippingStateCode || ''
       };
@@ -101,6 +105,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       phone: '',
       address: '',
       city: '',
+      zipCode: '',
       stateName: profile.stateName,
       stateCode: profile.stateCode,
       idType: 'PAN',
@@ -108,6 +113,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       gstin: '',
       shippingAddress: '',
       shippingCity: '',
+      shippingZipCode: '',
       shippingStateName: '',
       shippingStateCode: ''
     };
@@ -128,11 +134,10 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
-  // Load next invoice number
   useEffect(() => {
     async function loadInvoiceNumber() {
       const num = await getNextInvoiceNumber(
-        profile.taxInvoicePrefix, // Use SNJ for both INV and DC
+        type === 'TAX_INVOICE' ? profile.taxInvoicePrefix : profile.challanPrefix,
         type
       );
       setInvoiceId(num);
@@ -689,9 +694,32 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                 <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">City</label>
                 <input
                   type="text"
+                  list="cities-list"
                   placeholder="e.g. Kolkata"
                   value={customerDetails.city}
                   onChange={(e) => handleCustomerFieldChange('city', e.target.value)}
+                  className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                />
+                <datalist id="cities-list">
+                  <option value="Kolkata" />
+                  <option value="Mumbai" />
+                  <option value="Delhi" />
+                  <option value="Chennai" />
+                  <option value="Bengaluru" />
+                  <option value="Hyderabad" />
+                  <option value="Ahmedabad" />
+                  <option value="Pune" />
+                  <option value="Surat" />
+                  <option value="Jaipur" />
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Zip Code</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 700001"
+                  value={customerDetails.zipCode || ''}
+                  onChange={(e) => handleCustomerFieldChange('zipCode', e.target.value)}
                   className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -699,7 +727,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
 
             {isShippingDifferent && (
               <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg p-3 mt-4">
-                <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-3">Shipping Details</h3>
+                <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wide mb-3">Shipping Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping Address</label>
@@ -715,29 +743,54 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                     <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping City</label>
                     <input
                       type="text"
-                      placeholder="e.g. Agra"
-                      value={customerDetails.shippingCity}
+                      list="shipping-cities-list"
+                      placeholder="e.g. Mumbai"
+                      value={customerDetails.shippingCity || ''}
                       onChange={(e) => handleCustomerFieldChange('shippingCity', e.target.value)}
                       className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping State</label>
-                    <select
-                      value={customerDetails.shippingStateName}
-                      onChange={(e) => handleCustomerFieldChange('shippingStateName', e.target.value)}
-                      className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="">Select State</option>
-                      {INDIAN_STATES.map((st) => (
-                        <option key={st.name} value={st.name}>
-                          {st.name} ({st.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <datalist id="shipping-cities-list">
+                    <option value="Kolkata" />
+                    <option value="Mumbai" />
+                    <option value="Delhi" />
+                    <option value="Chennai" />
+                    <option value="Bengaluru" />
+                    <option value="Hyderabad" />
+                    <option value="Ahmedabad" />
+                    <option value="Pune" />
+                    <option value="Surat" />
+                    <option value="Jaipur" />
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping Zip</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 400001"
+                    value={customerDetails.shippingZipCode || ''}
+                    onChange={(e) => handleCustomerFieldChange('shippingZipCode', e.target.value)}
+                    className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping State</label>
+                  <select
+                    value={customerDetails.shippingStateName}
+                    onChange={(e) => handleCustomerFieldChange('shippingStateName', e.target.value)}
+                    className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="">Select State</option>
+                    {INDIAN_STATES.map((st) => (
+                      <option key={st.name} value={st.name}>
+                        {st.name} ({st.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
             )}
 
             {/* ID Proof Type Toggle & Value */}

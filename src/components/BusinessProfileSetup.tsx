@@ -505,7 +505,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
               </p>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Address *</label>
                 <input
@@ -521,6 +521,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                 <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">City *</label>
                 <input
                   type="text"
+                  list="cities-list-profile"
                   required
                   placeholder="e.g. Kolkata"
                   value={formData.city}
@@ -532,6 +533,28 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                       jurisdiction: (prev.jurisdiction || '').trim() === '' || prev.jurisdiction === 'Kolkata' ? newCity : prev.jurisdiction
                     }));
                   }}
+                  className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500"
+                />
+                <datalist id="cities-list-profile">
+                  <option value="Kolkata" />
+                  <option value="Mumbai" />
+                  <option value="Delhi" />
+                  <option value="Chennai" />
+                  <option value="Bengaluru" />
+                  <option value="Hyderabad" />
+                  <option value="Ahmedabad" />
+                  <option value="Pune" />
+                  <option value="Surat" />
+                  <option value="Jaipur" />
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Zip Code / Pincode</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 700001"
+                  value={formData.zipCode || ''}
+                  onChange={e => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>

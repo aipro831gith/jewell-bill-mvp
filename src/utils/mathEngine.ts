@@ -99,8 +99,14 @@ export function applyReverseCalculation(
     };
   }
 
-  // Target Taxable Amount: Target Total / 1.03
-  const targetTaxable = targetTotal / 1.03;
+  const cgstPercent = isLocal ? 1.5 : 0;
+  const sgstPercent = isLocal ? 1.5 : 0;
+  const igstPercent = isLocal ? 0 : 3.0;
+  const totalGstPercent = cgstPercent + sgstPercent + igstPercent;
+  const gstDivisor = 1 + (totalGstPercent / 100);
+
+  // Target Taxable Amount: Target Total / gstDivisor
+  const targetTaxable = targetTotal / gstDivisor;
   const exactRate = targetTaxable / totalWeightInGrams;
 
   // Helper to test if a given 2-decimal rate hits the target exactly without discount
@@ -153,7 +159,7 @@ export function applyReverseCalculation(
     newSubtotal = toFixed2(newSubtotal + toFixed2(item.weightInGrams * adjustedRate));
   });
   
-  // We aim for exactly targetTotal / 1.03
+  // We aim for exactly targetTotal / gstDivisor
   const discountBoxValue = Math.max(0, toFixed2(newSubtotal - targetTaxable));
 
   return {
