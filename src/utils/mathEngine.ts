@@ -111,7 +111,10 @@ export function applyReverseCalculation(
   const testRate = toFixed2(newRate);
   
   // Calculate raw test grand total
-  const testSubtotal = toFixed2(totalWeightInGrams * testRate);
+  let testSubtotal = 0;
+  items.forEach(item => {
+    testSubtotal = toFixed2(testSubtotal + toFixed2(item.weightInGrams * testRate));
+  });
   let testCgst = 0;
   let testSgst = 0;
   let testIgst = 0;
@@ -137,7 +140,10 @@ export function applyReverseCalculation(
     const adjustedRate = toFixed2(Math.ceil(newRate * 100) / 100);
     
     // 2. New Subtotal based on adjusted rate
-    const newSubtotal = toFixed2(totalWeightInGrams * adjustedRate);
+    let newSubtotal = 0;
+    items.forEach(item => {
+      newSubtotal = toFixed2(newSubtotal + toFixed2(item.weightInGrams * adjustedRate));
+    });
     
     // 3. To hit the exact targetTotal after positive round off, the rawGrandTotal must be <= targetTotal and > targetTotal - 1
     // We aim for exactly targetTotal / 1.03

@@ -87,7 +87,7 @@ export const ProfileSelection: React.FC<ProfileSelectionProps> = ({
                 {/* Delete Hover Badge (Top Right of Avatar) */}
                 <button
                   onClick={(e) => profile.id !== undefined && handleDeleteClick(profile.id, profile.brandName, e)}
-                  className="absolute top-0 right-4 sm:right-5 bg-red-650 hover:bg-red-700 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition duration-200 z-10 hover:scale-110"
+                  className="absolute top-0 right-4 sm:right-5 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition duration-200 z-10 hover:scale-110"
                   title="Delete Brand Profile"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -104,7 +104,7 @@ export const ProfileSelection: React.FC<ProfileSelectionProps> = ({
 
                 {profile.templateId && (
                   <span className={`text-[8px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded mt-1.5 ${
-                    profile.templateId === 1 ? 'bg-indigo-650/15 text-indigo-400' : 'bg-rose-650/15 text-rose-400'
+                    profile.templateId === 1 ? 'bg-indigo-600/10 text-indigo-400' : 'bg-rose-600/10 text-rose-400'
                   }`}>
                     Template {profile.templateId}
                   </span>
@@ -129,7 +129,7 @@ export const ProfileSelection: React.FC<ProfileSelectionProps> = ({
       </div>
 
       {/* Footer Branding */}
-      <div className="max-w-6xl w-full mx-auto text-center border-t border-zinc-900 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-650 gap-4">
+      <div className="max-w-6xl w-full mx-auto text-center border-t border-zinc-900 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-4">
         <span>Sri Narayan Jewellers Wholesale Invoice Suite (v5.0)</span>
         <div className="flex items-center space-x-1 text-zinc-500">
           <Sparkles className="h-3.5 w-3.5 text-indigo-400" />

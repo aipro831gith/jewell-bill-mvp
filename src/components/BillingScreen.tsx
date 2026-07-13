@@ -208,13 +208,16 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
 
   // Add item
   const handleAddItem = () => {
+    setCustomPayableAmount(null);
+    setDiscountApplied(0);
+    setTargetTotalInput('');
     const newItem: InvoiceItem = {
       id: Math.random().toString(36).substring(2, 9),
       metal: 'GOLD',
       itemName: 'Gold Ornaments',
       hsn: '711319', // Default Gold Ornaments HSN
       purityType: 'Karat',
-      purityValue: '22K916',
+      purityValue: '22K',
       weight: 0,
       weightUnit: 'gm',
       weightInGrams: 0,
@@ -225,10 +228,16 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   };
 
   const handleRemoveItem = (id: string) => {
+    setCustomPayableAmount(null);
+    setDiscountApplied(0);
+    setTargetTotalInput('');
     setItems(prev => prev.filter(item => item.id !== id));
   };
 
   const handleItemFieldChange = (id: string, field: keyof InvoiceItem, value: any) => {
+    setCustomPayableAmount(null);
+    setDiscountApplied(0);
+    setTargetTotalInput('');
     setItems(prev => prev.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
@@ -986,7 +995,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
               </div>
             ) : (
               <div className="py-8 border border-dashed border-zinc-850 rounded-xl text-center flex flex-col items-center">
-                <Trash2 className="h-7 w-7 text-zinc-650 mb-1" />
+                <Trash2 className="h-7 w-7 text-zinc-500 mb-1" />
                 <span className="text-zinc-500 text-xs">No items in the list. Click "+ Add Item" above.</span>
               </div>
             )}
@@ -1063,7 +1072,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                   onClick={handlePayableAmountOverride}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center font-bold text-sm"
                 >
-                  ✓
+                  Apply
                 </button>
               </div>
             </div>

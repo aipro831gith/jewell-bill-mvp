@@ -266,7 +266,7 @@ async function renderTemplate1(
   // Items
   let curY = 120.3;
   invoice.items.forEach((item, idx) => {
-    const pStr = item.purityValue !== 'None' ? (item.purityType === 'Karat' ? `${item.purityValue}K` : `${item.purityValue}%`) : '';
+    const pStr = item.purityValue !== 'None' ? (item.purityType === 'Karat' ? (item.purityValue.endsWith('K') ? item.purityValue : `${item.purityValue}K`) : `${item.purityValue}%`) : '';
     const desc = `${item.itemName.toUpperCase()} ${pStr}`.trim();
     
     let cIdx = 0;
@@ -549,7 +549,7 @@ async function renderTemplate2(
   // Draw Item Rows
   let curY = 100.5;
   invoice.items.forEach((item, idx) => {
-    const pStr = item.purityValue !== 'None' ? (item.purityType === 'Karat' ? `${item.purityValue}K` : `${item.purityValue}%`) : '';
+    const pStr = item.purityValue !== 'None' ? (item.purityType === 'Karat' ? (item.purityValue.endsWith('K') ? item.purityValue : `${item.purityValue}K`) : `${item.purityValue}%`) : '';
     const desc = item.itemName.toUpperCase();
 
     let cIdx = 0;
