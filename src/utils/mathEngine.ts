@@ -5,6 +5,10 @@ export function toFixed2(value: number): number {
   return Number(Number(value).toFixed(2));
 }
 
+export function toFixed3(value: number): number {
+  return Number(Number(value).toFixed(3));
+}
+
 export interface CalculationResult {
   totalTaxableBeforeDiscount: number;
   discountApplied: number;
@@ -57,8 +61,8 @@ export function calculateInvoiceTotals(
   // 4. Raw Grand Total: Taxable + GST
   const rawGrandTotal = toFixed2(totalTaxableAfterDiscount + cgst + sgst + igst);
 
-  // 5. Payable Amount: rounded to nearest whole number
-  const payableAmount = Math.round(rawGrandTotal);
+  // 5. Payable Amount: always positive round off (ceiling)
+  const payableAmount = Math.ceil(rawGrandTotal);
 
   return {
     totalTaxableBeforeDiscount,
@@ -118,10 +122,11 @@ export function applyReverseCalculation(
     testIgst = toFixed2(testSubtotal * 0.03);
   }
   const testRawGrandTotal = toFixed2(testSubtotal + testCgst + testSgst + testIgst);
+  const testPayableAmount = Math.ceil(testRawGrandTotal);
 
-  // Check if test matches Target Total down to the exact paisa (2 decimals) or rounded
-  if (Math.abs(testRawGrandTotal - targetTotal) < 0.009) {
-    // Situation 1: Matches perfectly. No adjustment needed.
+  // Check if test matches Target Total
+  if (testPayableAmount === targetTotal) {
+    // Situation 1: Matches perfectly with positive round off. No adjustment needed.
     return {
       updatedItems: items.map((item) => ({ id: item.id, ratePerGram: testRate })),
       discountApplied: 0,
@@ -134,12 +139,10 @@ export function applyReverseCalculation(
     // 2. New Subtotal based on adjusted rate
     const newSubtotal = toFixed2(totalWeightInGrams * adjustedRate);
     
-    // 3. Discount box value = newSubtotal - targetTaxable
+    // 3. To hit the exact targetTotal after positive round off, the rawGrandTotal must be <= targetTotal and > targetTotal - 1
+    // We aim for exactly targetTotal / 1.03
     const discountBoxValue = toFixed2(newSubtotal - targetTaxable);
 
-    // Verify the math works with the discountBoxValue
-    // totalTaxableAfterDiscount = newSubtotal - discountBoxValue = targetTaxable
-    // tax = targetTaxable * 0.03. Total = targetTaxable * 1.03 = TargetTotal
     return {
       updatedItems: items.map((item) => ({ id: item.id, ratePerGram: adjustedRate })),
       discountApplied: discountBoxValue,

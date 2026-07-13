@@ -96,36 +96,39 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        
-        // Downscale image if too large
-        const MAX_DIM = 600;
-        if (width > MAX_DIM || height > MAX_DIM) {
-          if (width > height) {
-            height = Math.round((height * MAX_DIM) / width);
-            width = MAX_DIM;
-          } else {
-            width = Math.round((width * MAX_DIM) / height);
-            height = MAX_DIM;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
         const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          let quality = 0.9;
-          let base64 = canvas.toDataURL('image/jpeg', quality);
-          // Loop quality adjustment until file size is below max limit
-          while ((base64.length * 3) / 4 / 1024 > maxSizeKB && quality > 0.1) {
-            quality -= 0.1;
-            base64 = canvas.toDataURL('image/jpeg', quality);
+        if (!ctx) return;
+
+        let MAX_DIM = 600;
+        let base64 = '';
+        
+        while (MAX_DIM > 100) {
+          let w = img.width;
+          let h = img.height;
+          if (w > MAX_DIM || h > MAX_DIM) {
+            if (w > h) {
+              h = Math.round((h * MAX_DIM) / w);
+              w = MAX_DIM;
+            } else {
+              w = Math.round((w * MAX_DIM) / h);
+              h = MAX_DIM;
+            }
           }
-          callback(base64);
+          canvas.width = w;
+          canvas.height = h;
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          
+          // Use PNG to preserve transparency
+          base64 = canvas.toDataURL('image/png');
+          const sizeKB = (base64.length * 3) / 4 / 1024;
+          
+          if (sizeKB <= maxSizeKB) {
+            break;
+          }
+          MAX_DIM = Math.round(MAX_DIM * 0.8);
         }
+        callback(base64);
       };
       img.src = e.target?.result as string;
     };
@@ -136,7 +139,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
     const file = e.target.files?.[0];
     if (file) {
       setCompressingLogo(true);
-      compressImage(file, 95, (base64) => {
+      compressImage(file, 300, (base64) => {
         setFormData(prev => ({ ...prev, logoData: base64 }));
         setCompressingLogo(false);
       });
@@ -147,7 +150,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
     const file = e.target.files?.[0];
     if (file) {
       setCompressingQr(true);
-      compressImage(file, 95, (base64) => {
+      compressImage(file, 300, (base64) => {
         setFormData(prev => ({ ...prev, qrCodeData: base64 }));
         setCompressingQr(false);
       });
@@ -454,7 +457,14 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                   required
                   placeholder="e.g. 19AAAFS0000A1Z2"
                   value={formData.gstin}
-                  onChange={e => setFormData(prev => ({ ...prev, gstin: e.target.value.toUpperCase() }))}
+                  onChange={e => {
+                    const gstin = e.target.value.toUpperCase();
+                    setFormData(prev => ({
+                      ...prev,
+                      gstin,
+                      pan: gstin.length >= 15 ? gstin.substring(2, 12) : prev.pan
+                    }));
+                  }}
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -466,7 +476,8 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                   placeholder="e.g. AAAFS0000A"
                   value={formData.pan}
                   onChange={e => setFormData(prev => ({ ...prev, pan: e.target.value.toUpperCase() }))}
-                  className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500"
+                  readOnly={formData.gstin.length >= 15}
+                  className={`w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500 ${formData.gstin.length >= 15 ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
               </div>
               <div>
@@ -513,7 +524,14 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                   required
                   placeholder="e.g. Kolkata"
                   value={formData.city}
-                  onChange={e => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                  onChange={e => {
+                    const newCity = e.target.value;
+                    setFormData(prev => ({
+                      ...prev,
+                      city: newCity,
+                      jurisdiction: prev.jurisdiction.trim() === '' || prev.jurisdiction === 'Kolkata' ? newCity : prev.jurisdiction
+                    }));
+                  }}
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>

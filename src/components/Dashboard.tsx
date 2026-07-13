@@ -1,18 +1,19 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Invoice, BusinessProfile } from '../db/database';
-import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, Trash2, LogOut, UserPlus } from 'lucide-react';
+import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, Trash2, LogOut, UserPlus, FileSearch } from 'lucide-react';
 import { generateAndDownloadPDF } from '../utils/pdfGenerator';
 
 interface DashboardProps {
   profile: BusinessProfile;
   profiles: BusinessProfile[];
   invoices: Invoice[];
-  onNewBill: (type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN') => void;
+  onNewBill: (type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN', customer?: any) => void;
   onEditProfile: () => void;
   onAddNewProfile: () => void;
   onSwitchProfile: (id: number) => void;
   onDeleteProfile: (id: number) => void;
   onLogOut: () => void;
+  onProfileSwitched?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -406,14 +407,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <button
-                          onClick={() => handleDownloadPDF(inv)}
-                          disabled={downloadingId === inv.invoiceId}
-                          className="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white disabled:opacity-50 p-2 rounded-lg transition border border-indigo-500/20 inline-flex items-center space-x-1"
-                        >
-                          <Download className="h-4 w-4" />
-                          <span className="text-xs font-semibold px-1">PDF</span>
-                        </button>
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => onNewBill(inv.type, inv.customerDetails)}
+                            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white p-2 rounded-lg transition border border-zinc-700 inline-flex items-center space-x-1"
+                            title="Repeat / Reference Invoice"
+                          >
+                            <FileText className="h-4 w-4" />
+                            <span className="text-xs font-semibold px-1">Ref</span>
+                          </button>
+                          <button
+                            onClick={() => handleDownloadPDF(inv)}
+                            disabled={downloadingId === inv.invoiceId}
+                            className="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white disabled:opacity-50 p-2 rounded-lg transition border border-indigo-500/20 inline-flex items-center space-x-1"
+                          >
+                            <Download className="h-4 w-4" />
+                            <span className="text-xs font-semibold px-1">PDF</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

@@ -16,6 +16,7 @@ function App() {
   
   // Billing specific states
   const [activeBillType, setActiveBillType] = useState<'TAX_INVOICE' | 'DELIVERY_CHALLAN'>('TAX_INVOICE');
+  const [referenceCustomer, setReferenceCustomer] = useState<Customer | undefined>();
 
   // Load database information on mount
   const refreshData = async () => {
@@ -55,8 +56,9 @@ function App() {
     refreshData();
   };
 
-  const handleNewBill = (type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN') => {
+  const handleNewBill = (type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN', customer?: Customer) => {
     setActiveBillType(type);
+    setReferenceCustomer(customer);
     setScreen('BILLING');
   };
 
@@ -145,11 +147,15 @@ function App() {
       )}
 
       {screen === 'BILLING' && profile && (
-        <BillingScreen
-          profile={profile}
+        <BillingScreen 
+          profile={profile} 
           type={activeBillType}
-          onBack={() => setScreen('DASHBOARD')}
-          onSaveSuccess={handleSaveSuccess}
+          initialCustomer={referenceCustomer}
+          onBack={() => {
+            setScreen('DASHBOARD');
+            setReferenceCustomer(undefined);
+          }} 
+          onSaveSuccess={refreshData} 
         />
       )}
     </div>

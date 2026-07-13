@@ -197,7 +197,13 @@ async function renderTemplate1(
   const rIdType = invoice.isSwappedAddress ? 'PAN NO' : (invoice.customerDetails.idType === 'AADHAAR' ? 'AADHAAR NO' : 'PAN NO');
 
   page.drawText(`NAME: ${rName}`, { x: x(40.9), y: y(79.8), size: 10, font: bold, color: colors.text });
-  page.drawText(`ADDRESS: ${rAddress}, ${rCity}`, { x: x(40.9), y: y(84.9), size: 9.5, font: bold, color: colors.text });
+  if (invoice.isShippingDifferent) {
+    page.drawText(`BILL TO: ${rAddress}, ${rCity}`, { x: x(40.9), y: y(84.9), size: 9, font: bold, color: colors.text });
+    const sCity = invoice.customerDetails.shippingCity ? `, ${invoice.customerDetails.shippingCity}` : '';
+    page.drawText(`SHIP TO: ${invoice.customerDetails.shippingAddress}${sCity}`, { x: x(40.9), y: y(90.6), size: 9, font: bold, color: colors.text });
+  } else {
+    page.drawText(`ADDRESS: ${rAddress}, ${rCity}`, { x: x(40.9), y: y(84.9), size: 9.5, font: bold, color: colors.text });
+  }
   page.drawText(`CONTACT NO: ${rPhone}`, { x: x(40.9), y: y(95.5), size: 10, font: bold, color: colors.text });
 
   // Right side buyer details
@@ -210,7 +216,7 @@ async function renderTemplate1(
   drawR(`STATE CODE: ${rStateCode}`, 95.5);
 
   // Responsive Table columns
-  const showPurity = profile.showPurityColumn ?? true;
+  const showPurity = invoice.items.some(item => item.purityValue !== 'None');
   let cols = [];
   if (showPurity) {
     cols = [
@@ -247,12 +253,15 @@ async function renderTemplate1(
     });
   });
 
+  const hasDiscount = invoice.discountApplied > 0;
+  const tyOffset = hasDiscount ? 11.4 : 0;
+
   // Draw Vertical Lines
   for (let i = 1; i < cols.length; i++) {
-    page.drawLine({ start: { x: x(cols[i].x), y: y(102.1) }, end: { x: x(cols[i].x), y: y(174.9) }, thickness: 1, color: rgb(0,0,0) });
+    page.drawLine({ start: { x: x(cols[i].x), y: y(102.1) }, end: { x: x(cols[i].x), y: y(174.9 - tyOffset) }, thickness: 1, color: rgb(0,0,0) });
   }
   // Outer box for items
-  page.drawRectangle({ x: x(27.0), y: y(174.9), width: mm(156.0), height: mm(72.8), borderColor: rgb(0,0,0), borderWidth: 1 });
+  page.drawRectangle({ x: x(27.0), y: y(174.9 - tyOffset), width: mm(156.0), height: mm(72.8 - tyOffset), borderColor: rgb(0,0,0), borderWidth: 1 });
 
   // Items
   let curY = 120.3;
@@ -293,7 +302,14 @@ async function renderTemplate1(
     page.drawText(val, { x: x(183.0) - mm(2) - bold.widthOfTextAtSize(val, 9), y: y(rowY + h/2 + 1), size: 9, font: bold, color: colors.text });
   };
 
-  let ty = 174.9;
+  let ty = 174.9 - tyOffset;
+  const subtotal = invoice.items.reduce((s, i) => s + i.taxableAmount, 0);
+  
+  if (hasDiscount) {
+    drawTotRow('SUBTOTAL :', subtotal.toFixed(2), colors.totalAmount, ty, 5.7); ty += 5.7;
+    drawTotRow('LESS: DISCOUNT :', `- ${invoice.discountApplied.toFixed(2)}`, colors.totalAmount, ty, 5.7); ty += 5.7;
+  }
+  
   drawTotRow('TOTAL AMOUNT :', totalTaxable.toFixed(2), colors.totalAmount, ty, 5.7); ty += 5.7;
   drawTotRow(`CGST ${invoice.taxDetails.cgstPercent}% :`, invoice.taxDetails.cgst.toFixed(2), colors.cgstSgst, ty, 5.7); ty += 5.7;
   drawTotRow(`SGST ${invoice.taxDetails.sgstPercent}% :`, invoice.taxDetails.sgst.toFixed(2), colors.cgstSgst, ty, 5.7); ty += 5.7;
@@ -332,6 +348,7 @@ async function renderTemplate1(
   // Footer Right Auth
   page.drawText(`FOR ${brandName}`, { x: x(183.0) - bold.widthOfTextAtSize(`FOR ${brandName}`, 9), y: y(227.7 + 3.2), size: 9, font: bold, color: colors.text });
   page.drawText('AUTHORISED SIGNATORY', { x: x(183.0) - bold.widthOfTextAtSize('AUTHORISED SIGNATORY', 9), y: y(253.1 + 3.2), size: 9, font: bold, color: colors.text });
+  page.drawText('E&OE', { x: x(27.0), y: y(253.1 + 3.2), size: 9, font: bold, color: colors.text });
 
   // EXACT Legal Text
   const jurTxt = `SUBJECT TO ${profile.jurisdiction.toUpperCase()} JURISDICTION`;
@@ -421,8 +438,13 @@ async function renderTemplate2(
 
   // Buyer Details
   page.drawRectangle({ x: x(12), y: y(57), width: mm(186), height: mm(5.5), color: darkBlue });
-  const btW = bold.widthOfTextAtSize('BUYER DETAILS', 9.5);
-  page.drawText('BUYER DETAILS', { x: x(12) + (mm(186) - btW)/2, y: y(53.2), size: 9.5, font: bold, color: gold });
+  if (invoice.isShippingDifferent) {
+    page.drawText('DETAILS OF RECEIVER (BILLED TO)', { x: x(15), y: y(53.2), size: 9, font: bold, color: gold });
+    page.drawText('DETAILS OF CONSIGNEE (SHIPPED TO)', { x: x(108), y: y(53.2), size: 9, font: bold, color: gold });
+  } else {
+    const btW = bold.widthOfTextAtSize('BUYER DETAILS', 9.5);
+    page.drawText('BUYER DETAILS', { x: x(12) + (mm(186) - btW)/2, y: y(53.2), size: 9.5, font: bold, color: gold });
+  }
 
   // Buyer details box border and split line
   page.drawRectangle({ x: x(12), y: y(85), width: mm(186), height: mm(28), borderColor: darkBlue, borderWidth: 1.5 });
@@ -436,7 +458,7 @@ async function renderTemplate2(
   const rStateCode = invoice.isSwappedAddress ? profile.stateCode : invoice.customerDetails.stateCode;
   const rGstin = invoice.isSwappedAddress ? profile.gstin : invoice.customerDetails.gstin;
   const rPan = invoice.isSwappedAddress ? profile.pan : invoice.customerDetails.panAadhaar;
-  const rPos = invoice.isSwappedAddress ? profile.stateName : invoice.customerDetails.placeOfSupply;
+  const rPos = invoice.isSwappedAddress ? profile.stateName : invoice.customerDetails.stateName;
   const rPhone = invoice.isSwappedAddress ? profile.phone : invoice.customerDetails.phone;
   const rIdType = invoice.customerDetails.idType === 'AADHAAR' ? 'AADHAAR ID' : 'PAN ID';
 
@@ -446,10 +468,6 @@ async function renderTemplate2(
     page.drawText(val, { x: x(38), y: y(bL), size: 8, font: bold, color: textDark });
     bL += 5.5;
   };
-  drawBL('NAME:', rName);
-  drawBL('CONTACT NO:', rPhone || 'NILL');
-  drawBL('GSTIN:', rGstin || 'NILL');
-  drawBL(`${rIdType}:`, rPan || 'NILL');
 
   let bR = 62.5;
   const drawBR = (lbl: string, val: string) => {
@@ -457,15 +475,34 @@ async function renderTemplate2(
     page.drawText(val, { x: x(135), y: y(bR), size: 8, font: bold, color: textDark });
     bR += 5.5;
   };
-  drawBR('ADDRESS:', `${rAddress}, ${rCity}`);
-  drawBR('STATE:', rState || 'NILL');
-  drawBR('STATE CODE:', rStateCode || 'NILL');
-  drawBR('POS:', rPos || 'NILL');
+
+  if (invoice.isShippingDifferent) {
+    drawBL('NAME:', rName);
+    drawBL('ADDRESS:', `${rAddress}, ${rCity}`);
+    drawBL('CONTACT NO:', rPhone || 'NILL');
+    drawBL('GSTIN:', rGstin || 'NILL');
+    drawBL(`${rIdType}:`, rPan || 'NILL');
+
+    drawBR('ADDRESS:', `${invoice.customerDetails.shippingAddress}, ${invoice.customerDetails.shippingCity}`);
+    drawBR('STATE:', invoice.customerDetails.shippingStateName || 'NILL');
+    drawBR('STATE CODE:', invoice.customerDetails.shippingStateCode || 'NILL');
+    drawBR('POS:', rPos || 'NILL');
+  } else {
+    drawBL('NAME:', rName);
+    drawBL('CONTACT NO:', rPhone || 'NILL');
+    drawBL('GSTIN:', rGstin || 'NILL');
+    drawBL(`${rIdType}:`, rPan || 'NILL');
+
+    drawBR('ADDRESS:', `${rAddress}, ${rCity}`);
+    drawBR('STATE:', rState || 'NILL');
+    drawBR('STATE CODE:', rStateCode || 'NILL');
+    drawBR('POS:', rPos || 'NILL');
+  }
 
   // Table header bar
   page.drawRectangle({ x: x(12), y: y(95), width: mm(186), height: mm(7), color: darkBlue });
 
-  const showPurity = profile.showPurityColumn ?? true;
+  const showPurity = invoice.items.some(item => item.purityValue !== 'None');
   let cols = [];
   if (showPurity) {
     cols = [
@@ -578,7 +615,11 @@ async function renderTemplate2(
   };
 
   const totalTaxable = invoice.items.reduce((s, i) => s + i.taxableAmount, 0) - invoice.discountApplied;
-  drawRow('TAXABLE AMOUNT', totalTaxable.toFixed(2));
+  if (invoice.discountApplied > 0) {
+    drawRow(`TAXABLE (LESS: ₹${invoice.discountApplied.toFixed(2)})`, totalTaxable.toFixed(2));
+  } else {
+    drawRow('TAXABLE AMOUNT', totalTaxable.toFixed(2));
+  }
   drawRow(`CGST @ ${invoice.taxDetails.cgstPercent}%`, invoice.taxDetails.cgst.toFixed(2));
   drawRow(`SGST @ ${invoice.taxDetails.sgstPercent}%`, invoice.taxDetails.sgst.toFixed(2));
   if (invoice.taxDetails.igst > 0) {

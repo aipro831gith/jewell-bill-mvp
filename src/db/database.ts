@@ -40,6 +40,10 @@ export interface Customer {
   stateCode: string;
   gstin: string;
   panAadhaar: string;
+  shippingAddress?: string;
+  shippingCity?: string;
+  shippingStateName?: string;
+  shippingStateCode?: string;
 }
 
 export interface InvoiceItem {
@@ -72,7 +76,10 @@ export interface Invoice {
     gstin: string;
     panAadhaar: string;
     idType: 'PAN' | 'AADHAAR';
-    placeOfSupply: string;
+    shippingAddress?: string;
+    shippingCity?: string;
+    shippingStateName?: string;
+    shippingStateCode?: string;
   };
   items: InvoiceItem[];
   taxDetails: {
@@ -87,6 +94,7 @@ export interface Invoice {
   grandTotal: number;
   payableAmount: number;
   paymentMode: 'Cash' | 'Card' | 'Bank Transfer' | 'UPI' | 'RTGS' | 'None';
+  isShippingDifferent?: boolean;
   isSwappedAddress?: boolean;
 }
 
@@ -192,8 +200,8 @@ export async function searchCustomers(query: string): Promise<Customer[]> {
   if (!query.trim()) return [];
   const lowercaseQuery = query.toLowerCase();
   return allCustomers.filter((c) =>
-    c.partyName.toLowerCase().includes(lowercaseQuery) ||
-    c.phone.includes(lowercaseQuery)
+    c.partyName.toLowerCase().split(' ').some(word => word.startsWith(lowercaseQuery)) ||
+    c.phone.startsWith(lowercaseQuery)
   );
 }
 

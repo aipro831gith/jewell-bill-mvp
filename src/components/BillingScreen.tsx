@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { searchCustomers, saveInvoice, getNextInvoiceNumber } from '../db/database';
 import type { Invoice, InvoiceItem, Customer, BusinessProfile } from '../db/database';
-import { calculateInvoiceTotals, applyReverseCalculation, toFixed2 } from '../utils/mathEngine';
+import { calculateInvoiceTotals, applyReverseCalculation, toFixed2, toFixed3 } from '../utils/mathEngine';
 import { generateAndDownloadPDF } from '../utils/pdfGenerator';
 import { INDIAN_STATES } from './BusinessProfileSetup';
 import { ArrowLeft, User, Plus, Trash2, ShieldAlert, Sparkles, FileText, Loader2, Landmark } from 'lucide-react';
@@ -9,6 +9,7 @@ import { ArrowLeft, User, Plus, Trash2, ShieldAlert, Sparkles, FileText, Loader2
 interface BillingScreenProps {
   profile: BusinessProfile;
   type: 'TAX_INVOICE' | 'DELIVERY_CHALLAN';
+  initialCustomer?: Customer;
   onBack: () => void;
   onSaveSuccess: () => void;
 }
@@ -16,6 +17,7 @@ interface BillingScreenProps {
 export const BillingScreen: React.FC<BillingScreenProps> = ({
   profile,
   type,
+  initialCustomer,
   onBack,
   onSaveSuccess,
 }) => {
@@ -29,6 +31,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
     return `${yyyy}-${mm}-${dd}`;
   });
   const [isSaved, setIsSaved] = useState(false);
+  const [isShippingDifferent, setIsShippingDifferent] = useState(false);
   const [isSwappedAddress, setIsSwappedAddress] = useState(false);
 
   const handleReset = async () => {
@@ -38,17 +41,23 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       phone: '',
       address: '',
       city: '',
-      stateName: '',
-      stateCode: '',
+      stateName: profile.stateName,
+      stateCode: profile.stateCode,
       idType: 'PAN',
       panAadhaar: '',
-      placeOfSupply: ''
+      gstin: '',
+      shippingAddress: '',
+      shippingCity: '',
+      shippingStateName: '',
+      shippingStateCode: ''
     });
     setCustomerSearchQuery('');
     setItems([]);
     setDiscountApplied(0);
     setPaymentMode('None');
     setCustomPayableAmount(null);
+    setTargetTotalInput('');
+    setIsShippingDifferent(false);
     setIsSwappedAddress(false);
     
     const num = await getNextInvoiceNumber(
@@ -66,17 +75,42 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   };
   
   // Customer details
-  const [customerDetails, setCustomerDetails] = useState({
-    partyName: '',
-    phonePrefix: '+91',
-    phone: '',
-    address: '',
-    city: '',
-    stateName: '',
-    stateCode: '',
-    idType: 'PAN' as 'PAN' | 'AADHAAR',
-    panAadhaar: '',
-    placeOfSupply: ''
+  // Initialize customerDetails from initialCustomer if provided, otherwise default
+  const [customerDetails, setCustomerDetails] = useState<Omit<Customer, 'id'>>(() => {
+    if (initialCustomer) {
+      return {
+        partyName: initialCustomer.partyName,
+        phonePrefix: initialCustomer.phonePrefix || '+91',
+        phone: initialCustomer.phone,
+        address: initialCustomer.address || '',
+        city: initialCustomer.city || '',
+        stateName: initialCustomer.stateName || profile.stateName,
+        stateCode: initialCustomer.stateCode || profile.stateCode,
+        idType: initialCustomer.idType || 'PAN',
+        panAadhaar: initialCustomer.panAadhaar || '',
+        gstin: initialCustomer.gstin || '',
+        shippingAddress: initialCustomer.shippingAddress || '',
+        shippingCity: initialCustomer.shippingCity || '',
+        shippingStateName: initialCustomer.shippingStateName || '',
+        shippingStateCode: initialCustomer.shippingStateCode || ''
+      };
+    }
+    return {
+      partyName: '',
+      phonePrefix: '+91',
+      phone: '',
+      address: '',
+      city: '',
+      stateName: profile.stateName,
+      stateCode: profile.stateCode,
+      idType: 'PAN',
+      panAadhaar: '',
+      gstin: '',
+      shippingAddress: '',
+      shippingCity: '',
+      shippingStateName: '',
+      shippingStateCode: ''
+    };
   });
 
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -90,6 +124,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   const [discountApplied, setDiscountApplied] = useState(0);
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Card' | 'Bank Transfer' | 'UPI' | 'RTGS' | 'None'>('None');
   const [customPayableAmount, setCustomPayableAmount] = useState<number | null>(null);
+  const [targetTotalInput, setTargetTotalInput] = useState('');
   
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
@@ -97,7 +132,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   useEffect(() => {
     async function loadInvoiceNumber() {
       const num = await getNextInvoiceNumber(
-        type === 'TAX_INVOICE' ? profile.taxInvoicePrefix : profile.challanPrefix,
+        profile.taxInvoicePrefix, // Use SNJ for both INV and DC
         type
       );
       setInvoiceId(num);
@@ -118,20 +153,25 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
     }
   }, [customerSearchQuery]);
 
-  const handleSelectCustomer = (cust: Customer) => {
+  const handleSelectCustomer = (c: Customer) => {
     setCustomerDetails({
-      partyName: cust.partyName,
+      partyName: c.partyName,
       phonePrefix: '+91',
-      phone: cust.phone,
-      address: cust.address,
-      city: cust.city,
-      stateName: cust.stateName,
-      stateCode: cust.stateCode,
-      idType: cust.panAadhaar.length === 12 ? 'AADHAAR' : 'PAN',
-      panAadhaar: cust.panAadhaar,
-      placeOfSupply: cust.stateName
+      phone: c.phone,
+      address: c.address,
+      city: c.city,
+      stateName: c.stateName,
+      stateCode: c.stateCode,
+      idType: c.panAadhaar.length === 12 ? 'AADHAAR' : 'PAN',
+      panAadhaar: c.panAadhaar,
+      gstin: c.gstin || '',
+      shippingAddress: c.shippingAddress || '',
+      shippingCity: c.shippingCity || '',
+      shippingStateName: c.shippingStateName || '',
+      shippingStateCode: c.shippingStateCode || ''
     });
-    setCustomerSearchQuery(cust.partyName);
+    if (c.shippingAddress) setIsShippingDifferent(true);
+    setCustomerSearchQuery(c.partyName);
     setShowSuggestions(false);
   };
 
@@ -139,12 +179,27 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
     if (field === 'panAadhaar') {
       const uppercased = value.toUpperCase();
       setCustomerDetails(prev => ({ ...prev, [field]: uppercased }));
+    } else if (field === 'gstin') {
+      const gstin = value.toUpperCase();
+      setCustomerDetails(prev => ({
+        ...prev,
+        gstin,
+        panAadhaar: gstin.length >= 15 ? gstin.substring(2, 12) : prev.panAadhaar,
+        idType: 'PAN'
+      }));
     } else if (field === 'stateName') {
       const selected = INDIAN_STATES.find(s => s.name === value);
       setCustomerDetails(prev => ({
         ...prev,
         stateName: value,
         stateCode: selected ? selected.code : ''
+      }));
+    } else if (field === 'shippingStateName') {
+      const selected = INDIAN_STATES.find(s => s.name === value);
+      setCustomerDetails(prev => ({
+        ...prev,
+        shippingStateName: value,
+        shippingStateCode: selected ? selected.code : ''
       }));
     } else {
       setCustomerDetails(prev => ({ ...prev, [field]: value }));
@@ -184,55 +239,63 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
             updated.itemName = 'Gold Ornaments';
             updated.hsn = '711319';
             updated.purityType = 'Karat';
-            updated.purityValue = '22K916';
+            updated.purityValue = '22K';
           } else {
             updated.itemName = 'Silver Ornaments';
-            updated.hsn = '711319';
+            updated.hsn = '711311';
             updated.purityType = 'Karat';
-            updated.purityValue = '18K750';
+            updated.purityValue = '18K';
           }
         } else if (field === 'itemName') {
           // Map exact HSN
           const hsnMap: Record<string, string> = {
             'Gold Ornaments': '711319',
-            'Pure Gold Bullion': '710812',
             'Gold Alloy Ornament': '711319',
+            'FINE GOLD (99.99%)': '710812',
+            'GOLD BULLION (99.90%)': '710812',
+            'PURE GOLD (99.50%)': '710812',
+            'Gold Coin': '711890',
             'Goldsmiths Wares': '711419',
-            'Silver Ornaments': '711319',
-            'Pure Silver Bullion': '710691',
-            'Silver Alloy Ornament': '711319',
+            'Silver Ornaments': '711311',
+            'Silver Alloy Ornament': '711311',
+            'FINE SILVER (99.99%)': '710691',
+            'PURE SILVER (99.00%)': '710691',
+            'Silver Coin': '711890',
             'Silversmiths Wares': '711411'
           };
           updated.hsn = hsnMap[value] || '';
+          
+          // Auto-purity for bullion
+          if (value === 'FINE GOLD (99.99%)' || value === 'FINE SILVER (99.99%)') {
+            updated.purityType = 'Percentage (%)';
+            updated.purityValue = '99.99';
+          } else if (value === 'GOLD BULLION (99.90%)') {
+            updated.purityType = 'Percentage (%)';
+            updated.purityValue = '99.90';
+          } else if (value === 'PURE GOLD (99.50%)') {
+            updated.purityType = 'Percentage (%)';
+            updated.purityValue = '99.50';
+          } else if (value === 'PURE SILVER (99.00%)') {
+            updated.purityType = 'Percentage (%)';
+            updated.purityValue = '99.00';
+          }
         }
 
         // Purity defaults on change
         if (field === 'purityType') {
-          if (value === 'Karat') {
-            updated.purityValue = '22K916';
-            if (updated.metal === 'GOLD') {
-              updated.itemName = 'Gold Ornaments';
-              updated.hsn = '711319';
-            } else {
-              updated.itemName = 'Silver Ornaments';
-              updated.hsn = '711319';
-            }
+          if (value === 'None') {
+            updated.purityValue = 'None';
+          } else if (value === 'Karat') {
+            updated.purityValue = '22K';
           } else {
             updated.purityValue = '91.6';
-            if (updated.metal === 'GOLD') {
-              updated.itemName = 'Gold Alloy Ornament';
-              updated.hsn = '711319';
-            } else {
-              updated.itemName = 'Silver Alloy Ornament';
-              updated.hsn = '711319';
-            }
           }
         }
 
         // Weight conversions
         const wVal = field === 'weight' ? Number(value) : updated.weight;
         const uVal = field === 'weightUnit' ? value : updated.weightUnit;
-        updated.weightInGrams = uVal === 'kg' ? toFixed2(wVal * 1000) : toFixed2(wVal);
+        updated.weightInGrams = uVal === 'kg' ? toFixed3(wVal * 1000) : toFixed3(wVal);
 
         // Subtotal
         updated.taxableAmount = toFixed2(updated.weightInGrams * updated.ratePerGram);
@@ -260,12 +323,13 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   const currentPayableAmount = customPayableAmount !== null ? customPayableAmount : forwardCalculations.payableAmount;
 
   // Reverse override implementation
-  const handlePayableAmountOverride = (val: string) => {
-    if (val.trim() === '') {
+  const handlePayableAmountOverride = () => {
+    if (targetTotalInput.trim() === '') {
       setCustomPayableAmount(null);
+      setDiscountApplied(0);
       return;
     }
-    const target = Number(val);
+    const target = Number(targetTotalInput);
     setCustomPayableAmount(target);
 
     const reverseResult = applyReverseCalculation(
@@ -310,7 +374,6 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       // 5. NILL Fallback Logic
       const phoneVal = customerDetails.phone.trim() === '' ? 'NILL' : customerDetails.phone.trim();
       const idVal = customerDetails.panAadhaar.trim() === '' ? 'NILL' : customerDetails.panAadhaar.trim();
-      const placeOfSupplyVal = customerDetails.placeOfSupply.trim() === '' ? customerDetails.stateName : customerDetails.placeOfSupply.trim();
 
       const finalPhoneStr = phoneVal === 'NILL' ? 'NILL' : `${customerDetails.phonePrefix} ${phoneVal}`;
 
@@ -327,12 +390,15 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
           city: customerDetails.city || 'NILL',
           stateName: customerDetails.stateName,
           stateCode: customerDetails.stateCode,
-          gstin: 'NILL',
+          gstin: customerDetails.gstin.trim() === '' ? 'NILL' : customerDetails.gstin.trim(),
           panAadhaar: idVal,
           idType: customerDetails.idType,
-          placeOfSupply: placeOfSupplyVal
+          shippingAddress: isShippingDifferent ? customerDetails.shippingAddress : undefined,
+          shippingCity: isShippingDifferent ? customerDetails.shippingCity : undefined,
+          shippingStateName: isShippingDifferent ? customerDetails.shippingStateName : undefined,
+          shippingStateCode: isShippingDifferent ? customerDetails.shippingStateCode : undefined
         },
-        items: items,
+        items,
         taxDetails: {
           cgst: finalCgst,
           sgst: finalSgst,
@@ -341,11 +407,12 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
           sgstPercent: forwardCalculations.sgstPercent,
           igstPercent: forwardCalculations.igstPercent
         },
-        discountApplied: discountApplied,
+        discountApplied: discountApplied || 0,
         grandTotal: finalGrandTotal,
-        payableAmount: currentPayableAmount,
+        payableAmount: finalPayableAmount,
         paymentMode: paymentMode,
-        isSwappedAddress: isSwappedAddress
+        isShippingDifferent,
+        isSwappedAddress
       };
 
       await saveInvoice(newInvoice);
@@ -581,14 +648,23 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Place of Supply</label>
-                <input
-                  type="text"
-                  placeholder="Defaults to customer state"
-                  value={customerDetails.placeOfSupply}
-                  onChange={(e) => handleCustomerFieldChange('placeOfSupply', e.target.value)}
-                  className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
-                />
+                <label className="flex items-center space-x-2 mt-5">
+                  <input
+                    type="checkbox"
+                    checked={isShippingDifferent}
+                    onChange={(e) => {
+                      setIsShippingDifferent(e.target.checked);
+                      if (!e.target.checked) {
+                        handleCustomerFieldChange('shippingAddress', '');
+                        handleCustomerFieldChange('shippingCity', '');
+                        handleCustomerFieldChange('shippingStateName', '');
+                        handleCustomerFieldChange('shippingStateCode', '');
+                      }
+                    }}
+                    className="rounded border-zinc-850 bg-zinc-950/60 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs text-zinc-300 font-semibold uppercase tracking-wider">Ship to a different address</span>
+                </label>
               </div>
             </div>
 
@@ -615,8 +691,61 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
               </div>
             </div>
 
+            {isShippingDifferent && (
+              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg p-3 mt-4">
+                <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-3">Shipping Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping Address</label>
+                    <input
+                      type="text"
+                      placeholder="Shipping street details"
+                      value={customerDetails.shippingAddress}
+                      onChange={(e) => handleCustomerFieldChange('shippingAddress', e.target.value)}
+                      className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping City</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Agra"
+                      value={customerDetails.shippingCity}
+                      onChange={(e) => handleCustomerFieldChange('shippingCity', e.target.value)}
+                      className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping State</label>
+                    <select
+                      value={customerDetails.shippingStateName}
+                      onChange={(e) => handleCustomerFieldChange('shippingStateName', e.target.value)}
+                      className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="">Select State</option>
+                      {INDIAN_STATES.map((st) => (
+                        <option key={st.name} value={st.name}>
+                          {st.name} ({st.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ID Proof Type Toggle & Value */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+              <div>
+                <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">GSTIN</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 19AAAFS0000A1Z2"
+                  value={customerDetails.gstin}
+                  onChange={(e) => handleCustomerFieldChange('gstin', e.target.value)}
+                  className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
               <div>
                 <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">ID proof type</label>
                 <div className="flex items-center space-x-3 py-1">
@@ -648,10 +777,11 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder={`Enter ${customerDetails.idType} proof value`}
+                  placeholder={customerDetails.idType === 'PAN' ? 'ABCDE1234F' : '123456789012'}
                   value={customerDetails.panAadhaar}
                   onChange={(e) => handleCustomerFieldChange('panAadhaar', e.target.value)}
-                  className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                  readOnly={customerDetails.gstin.length >= 15 && customerDetails.idType === 'PAN'}
+                  className={`w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 ${customerDetails.gstin.length >= 15 && customerDetails.idType === 'PAN' ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
               </div>
             </div>
@@ -723,15 +853,20 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                             {item.metal === 'GOLD' ? (
                               <>
                                 <option value="Gold Ornaments">Gold Ornaments</option>
-                                <option value="Pure Gold Bullion">Pure Gold Bullion</option>
                                 <option value="Gold Alloy Ornament">Gold Alloy Ornament</option>
+                                <option value="FINE GOLD (99.99%)">FINE GOLD (99.99%)</option>
+                                <option value="GOLD BULLION (99.90%)">GOLD BULLION (99.90%)</option>
+                                <option value="PURE GOLD (99.50%)">PURE GOLD (99.50%)</option>
+                                <option value="Gold Coin">Gold Coin</option>
                                 <option value="Goldsmiths Wares">Goldsmiths Wares</option>
                               </>
                             ) : (
                               <>
                                 <option value="Silver Ornaments">Silver Ornaments</option>
-                                <option value="Pure Silver Bullion">Pure Silver Bullion</option>
                                 <option value="Silver Alloy Ornament">Silver Alloy Ornament</option>
+                                <option value="FINE SILVER (99.99%)">FINE SILVER (99.99%)</option>
+                                <option value="PURE SILVER (99.00%)">PURE SILVER (99.00%)</option>
+                                <option value="Silver Coin">Silver Coin</option>
                                 <option value="Silversmiths Wares">Silversmiths Wares</option>
                               </>
                             )}
@@ -753,25 +888,28 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                                 onChange={(e) => handleItemFieldChange(item.id, 'purityType', e.target.value)}
                                 className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
                               >
+                                <option value="None">None</option>
                                 <option value="Karat">Standard Purity (Karat)</option>
                                 <option value="Percentage (%)">Alloy (Percentage)</option>
                               </select>
                             </td>
                             <td className="py-2.5 pr-2">
-                              {item.purityType === 'Karat' ? (
+                              {item.purityType === 'None' ? (
+                                <span className="text-zinc-600 text-xs px-1.5 flex justify-center">-</span>
+                              ) : item.purityType === 'Karat' ? (
                                 <select
                                   value={item.purityValue}
                                   onChange={(e) => handleItemFieldChange(item.id, 'purityValue', e.target.value)}
                                   className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
                                 >
                                   <option value="None">None</option>
-                                  <option value="24K995">24K995</option>
-                                  <option value="23K958">23K958</option>
-                                  <option value="22K916">22K916</option>
-                                  <option value="20K833">20K833</option>
-                                  <option value="18K750">18K750</option>
-                                  <option value="14K585">14K585</option>
-                                  <option value="9K375">9K375</option>
+                                  <option value="24K">24K</option>
+                                  <option value="23K">23K</option>
+                                  <option value="22K">22K</option>
+                                  <option value="20K">20K</option>
+                                  <option value="18K">18K</option>
+                                  <option value="14K">14K</option>
+                                  <option value="9K">9K</option>
                                 </select>
                               ) : (
                                 <input
@@ -820,6 +958,12 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                             onChange={(e) => {
                               const clean = e.target.value.replace(/[^0-9.]/g, '');
                               handleItemFieldChange(item.id, 'ratePerGram', clean);
+                            }}
+                            onBlur={() => {
+                              if (item.ratePerGram) {
+                                const roundedRate = toFixed2(Math.ceil(Number(item.ratePerGram) * 100) / 100);
+                                handleItemFieldChange(item.id, 'ratePerGram', roundedRate);
+                              }
                             }}
                             className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 w-20"
                           />
@@ -904,16 +1048,24 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
             {/* Target override inline */}
             <div className="mt-4 pt-4 border-t border-zinc-850">
               <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Target Total Negotiated Override</label>
-              <input
-                type="text"
-                placeholder="e.g. 59600"
-                value={customPayableAmount !== null ? customPayableAmount : ''}
-                onChange={(e) => {
-                  const clean = e.target.value.replace(/[^0-9]/g, '');
-                  handlePayableAmountOverride(clean);
-                }}
-                className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-indigo-400 font-bold focus:outline-none focus:border-indigo-500 placeholder-zinc-700"
-              />
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  placeholder="e.g. 59600"
+                  value={targetTotalInput}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/[^0-9]/g, '');
+                    setTargetTotalInput(clean);
+                  }}
+                  className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-indigo-400 font-bold focus:outline-none focus:border-indigo-500 placeholder-zinc-700"
+                />
+                <button
+                  onClick={handlePayableAmountOverride}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center font-bold text-sm"
+                >
+                  ✓
+                </button>
+              </div>
             </div>
           </div>
 
