@@ -40,6 +40,8 @@ export interface Customer {
   stateCode: string;
   gstin: string;
   panAadhaar: string;
+  phonePrefix?: string;
+  idType?: 'PAN' | 'AADHAAR';
   shippingAddress?: string;
   shippingCity?: string;
   shippingStateName?: string;
@@ -51,7 +53,7 @@ export interface InvoiceItem {
   metal: 'GOLD' | 'SILVER';
   itemName: string;
   hsn: string;
-  purityType: 'Karat' | 'Percentage (%)';
+  purityType: 'Karat' | 'Percentage (%)' | 'None';
   purityValue: string; // e.g. "22K916" or "91.6" or "None"
   weight: number; // in grams or kg entered
   weightUnit: 'gm' | 'kg';

@@ -392,7 +392,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
           stateCode: customerDetails.stateCode,
           gstin: customerDetails.gstin.trim() === '' ? 'NILL' : customerDetails.gstin.trim(),
           panAadhaar: idVal,
-          idType: customerDetails.idType,
+          idType: customerDetails.idType || 'PAN',
           shippingAddress: isShippingDifferent ? customerDetails.shippingAddress : undefined,
           shippingCity: isShippingDifferent ? customerDetails.shippingCity : undefined,
           shippingStateName: isShippingDifferent ? customerDetails.shippingStateName : undefined,
@@ -409,7 +409,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         },
         discountApplied: discountApplied || 0,
         grandTotal: finalGrandTotal,
-        payableAmount: finalPayableAmount,
+        payableAmount: currentPayableAmount,
         paymentMode: paymentMode,
         isShippingDifferent,
         isSwappedAddress

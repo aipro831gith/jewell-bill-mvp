@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Invoice, BusinessProfile } from '../db/database';
-import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, Trash2, LogOut, UserPlus, FileSearch } from 'lucide-react';
+import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, Trash2, LogOut, UserPlus } from 'lucide-react';
 import { generateAndDownloadPDF } from '../utils/pdfGenerator';
 
 interface DashboardProps {

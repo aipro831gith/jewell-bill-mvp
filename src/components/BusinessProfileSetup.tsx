@@ -476,8 +476,8 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                   placeholder="e.g. AAAFS0000A"
                   value={formData.pan}
                   onChange={e => setFormData(prev => ({ ...prev, pan: e.target.value.toUpperCase() }))}
-                  readOnly={formData.gstin.length >= 15}
-                  className={`w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500 ${formData.gstin.length >= 15 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  readOnly={(formData.gstin || '').length >= 15}
+                  className={`w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500 ${(formData.gstin || '').length >= 15 ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
               </div>
               <div>
@@ -529,7 +529,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                     setFormData(prev => ({
                       ...prev,
                       city: newCity,
-                      jurisdiction: prev.jurisdiction.trim() === '' || prev.jurisdiction === 'Kolkata' ? newCity : prev.jurisdiction
+                      jurisdiction: (prev.jurisdiction || '').trim() === '' || prev.jurisdiction === 'Kolkata' ? newCity : prev.jurisdiction
                     }));
                   }}
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500"

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getActiveProfile, getAllInvoices, getAllProfiles, deleteProfile } from './db/database';
-import type { BusinessProfile, Invoice } from './db/database';
+import type { BusinessProfile, Invoice, Customer } from './db/database';
 import { BusinessProfileSetup } from './components/BusinessProfileSetup';
 import { Dashboard } from './components/Dashboard';
 import { BillingScreen } from './components/BillingScreen';
@@ -62,10 +62,6 @@ function App() {
     setScreen('BILLING');
   };
 
-  const handleSaveSuccess = () => {
-    setScreen('DASHBOARD');
-    refreshData();
-  };
 
   const handleSwitchProfile = async (id: number) => {
     localStorage.setItem('activeProfileId', id.toString());
