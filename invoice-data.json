@@ -1,0 +1,52 @@
+{
+  "documentType": "TAX INVOICE",
+  "copyLabels": [
+    "ORIGINAL FOR RECIPIENT",
+    "DUPLICATE FOR TRANSPORTER",
+    "TRIPLICATE FOR SUPPLIER"
+  ],
+  "invoice": {
+    "number": "GAC/26-27/019",
+    "date": "29-MAY-2026"
+  },
+  "seller": {
+    "brandName": "G. AGARWAL CHAIN",
+    "gstin": "19AFRPA7889M1ZD",
+    "pan": "AFRPA7889M",
+    "address": "Ground Floor, 26no Banstala Gulee, Kolkata, West Bengal, 700007",
+    "phone": "+91 74498 98533",
+    "email": "gagarwalc@gmail.com",
+    "logoUrl": "./template1-logo.png",
+    "bank": {
+      "name": "ALLAHBAD BANK",
+      "branch": "GARDEN REACH, KOLKATA",
+      "accountName": "G AGARWAL CHAIN",
+      "accountNo": "50373219833",
+      "ifsc": "IDIB000K752"
+    },
+    "jurisdiction": "KOLKATA"
+  },
+  "customer": {
+    "name": "SRI NARAYAN JEWELLERS",
+    "address": "71no, MANOHAR DAS STREET, KOLKATA 700007, WEST BENGAL",
+    "phone": "NILL",
+    "gstin": "19BCPPA490E1ZQ",
+    "idType": "PAN",
+    "idNumber": "BCPPA490E1",
+    "state": "WEST BENGAL",
+    "stateCode": "19"
+  },
+  "purityColumn": true,
+  "taxMode": "LOCAL",
+  "discountAmount": 0,
+  "items": [
+    {
+      "description": "GOLD ORNAMENTS",
+      "hsn": "7113",
+      "purity": "18K",
+      "weight": 12.5,
+      "rate": 12000
+    }
+  ],
+  "paymentMode": "CASH"
+}

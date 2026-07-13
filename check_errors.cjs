@@ -11,7 +11,7 @@ const puppeteer = require('puppeteer');
   );
 
   console.log('Navigating to preview server...');
-  await page.goto('http://localhost:4173/jewell-bill-mvp/', { waitUntil: 'networkidle2' });
+  await page.goto('http://127.0.0.1:4173/', { waitUntil: 'networkidle2' });
   
   console.log('Page loaded. Taking screenshot...');
   await page.screenshot({ path: 'C:/Users/ASUS/Dropbox/PC/Desktop/TRIAL SNJ BILLING/screenshot.png' });
