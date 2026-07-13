@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 
 function App() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [profiles, setProfiles] = useState<BusinessProfile[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -36,8 +37,9 @@ function App() {
       } else {
         setScreen('DASHBOARD');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading DB values', err);
+      setError(err.message || 'Failed to initialize offline database.');
     } finally {
       setLoading(false);
     }
@@ -99,6 +101,26 @@ function App() {
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center space-y-4">
         <Loader2 className="h-10 w-10 text-indigo-500 animate-spin" />
         <span className="text-sm font-semibold text-zinc-400 font-outfit">Loading local offline database...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center space-y-4 p-8 text-center">
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-4 rounded-lg max-w-md">
+          <h2 className="text-lg font-bold mb-2">Database Error</h2>
+          <p className="text-sm">{error}</p>
+          <p className="text-xs mt-4 opacity-75">
+            This usually happens if your browser is in strict Private/Incognito mode or if storage is disabled. Please allow local storage/IndexedDB for this site.
+          </p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-sm transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }
