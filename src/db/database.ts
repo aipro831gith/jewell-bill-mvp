@@ -20,6 +20,7 @@ export interface BusinessProfile {
   email: string;
   jurisdiction: string;
   templateId: 1 | 2; // Selected PDF Design template
+  showPurityColumn?: boolean; // Toggles purity column visibility
   bankName?: string;
   branch?: string;
   accountName?: string;

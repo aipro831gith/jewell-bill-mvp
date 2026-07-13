@@ -75,6 +75,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
       email: '',
       jurisdiction: 'Kolkata',
       templateId: 1,
+      showPurityColumn: true,
       bankName: '',
       branch: '',
       accountName: '',
@@ -552,6 +553,21 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>
+            </div>
+            <div className="mt-6 border-t border-zinc-800 pt-6 flex items-center justify-between">
+              <div>
+                <label className="block text-sm font-semibold text-zinc-200">Show Purity Column</label>
+                <p className="text-xs text-zinc-400 mt-1">Enable this to show the Purity column in your invoices. When disabled, other columns will stretch to fill the space.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={formData.showPurityColumn ?? true}
+                  onChange={(e) => setFormData(prev => ({ ...prev, showPurityColumn: e.target.checked }))}
+                />
+                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+              </label>
             </div>
           </div>
 

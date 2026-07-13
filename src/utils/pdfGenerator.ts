@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont, PDFImage } from 'pdf-lib';
 import type { Invoice, BusinessProfile } from '../db/database';
 
 function numberToWords(num: number): string {
@@ -25,6 +25,8 @@ function hexToRgb(hex: string) {
   ) : rgb(0,0,0);
 }
 
+const mm = (val: number) => val * 2.83465;
+
 export async function generateAndDownloadPDF(invoice: Invoice, profile: BusinessProfile) {
   const pdfDoc = await PDFDocument.create();
   
@@ -46,339 +48,387 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     const d = new Date(invoice.date);
     const m = d.getMonth();
     const y = d.getFullYear();
-    if (m < 3) return `${y-1} - ${y}`;
-    return `${y} - ${y+1}`;
+    if (m < 3) return `${y-1}-${y.toString().slice(-2)}`;
+    return `${y}-${(y+1).toString().slice(-2)}`;
   })();
 
-  const templateId = invoice.templateId || profile.templateId || 1;
+  const templateId = profile.templateId || 1;
+
+  // Embed brand logo
+  let logoImage: PDFImage | null = null;
+  if (profile.logoData) {
+    try {
+      const base64Data = profile.logoData.split(',')[1];
+      const logoBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      if (profile.logoData.startsWith('data:image/png')) {
+         logoImage = await pdfDoc.embedPng(logoBytes);
+      } else {
+         logoImage = await pdfDoc.embedJpg(logoBytes);
+      }
+    } catch (e) {
+      console.error('Could not embed logo', e);
+    }
+  }
 
   for (let i = 1; i <= numPages; i++) {
-    const page = pdfDoc.addPage([595.27, 841.89]); // A4 scale
+    const page = pdfDoc.addPage([595.28, 841.89]); // A4 210x297mm
     const { width, height } = page.getSize();
 
     let copyLabel = '';
     if (isChallan) {
-      if (i === 1) copyLabel = 'COPY 1: ORIGINAL FOR CONSIGNEE';
-      else if (i === 2) copyLabel = 'COPY 2: DUPLICATE FOR TRANSPORTER';
-      else copyLabel = 'COPY 3: TRIPLICATE FOR CONSIGNOR';
+      if (i === 1) copyLabel = 'ORIGINAL FOR CONSIGNEE';
+      else if (i === 2) copyLabel = 'DUPLICATE FOR TRANSPORTER';
+      else copyLabel = 'TRIPLICATE FOR CONSIGNOR';
     } else {
-      if (i === 1) copyLabel = 'ORIGINAL Buyer Copy';
-      else if (i === 2) copyLabel = 'DUPLICATE Transporter Copy';
-      else copyLabel = 'TRIPLICATE Supplier Copy';
+      if (i === 1) copyLabel = 'ORIGINAL FOR RECIPIENT';
+      else if (i === 2) copyLabel = 'DUPLICATE FOR TRANSPORTER';
+      else copyLabel = 'TRIPLICATE FOR SUPPLIER';
     }
     
-    // Embed brand logo
-    let logoImage = null;
-    if (profile.logoData) {
-      try {
-        const base64Data = profile.logoData.split(',')[1];
-        const logoBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-        if (profile.logoData.startsWith('data:image/png')) {
-           logoImage = await pdfDoc.embedPng(logoBytes);
-        } else {
-           logoImage = await pdfDoc.embedJpg(logoBytes);
-        }
-      } catch (e) {
-        console.error('Could not embed logo', e);
-      }
-    }
-
     if (templateId === 1) {
       await renderTemplate1(page, width, height, invoice, profile, copyLabel, helveticaFont, helveticaBold, helveticaOblique, helveticaBoldOblique, logoImage, invoiceDateStr);
     } else {
-      await renderTemplate2(page, width, height, invoice, profile, copyLabel, helveticaFont, helveticaBold, helveticaOblique, helveticaBoldOblique, logoImage, invoiceDateStr, financialYear);
+      await renderTemplate2(page, width, height, invoice, profile, copyLabel, helveticaFont, helveticaBold, helveticaOblique, helveticaBoldOblique, null, invoiceDateStr, financialYear);
     }
   }
 
   const pdfBytes = await pdfDoc.save();
-  const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
   
-  try {
-    window.open(url, '_blank');
-  } catch (e) {
-    console.error('Failed to open PDF preview window', e);
+  if (typeof window !== 'undefined') {
+    const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const fileName = `${invoice.type === 'TAX_INVOICE' ? 'Tax_Invoice' : 'Delivery_Challan'}_${invoice.customerDetails.partyName.replace(/[^a-z0-9]/gi, '_')}_${invoice.invoiceId.replace(/\//g, '_')}.pdf`;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 15000);
   }
-
-  const link = document.createElement('a');
-  link.href = url;
-  const fileName = `${invoice.type === 'TAX_INVOICE' ? 'Tax_Invoice' : 'Delivery_Challan'}_${invoice.customerDetails.partyName.replace(/[^a-z0-9]/gi, '_')}_${invoice.invoiceId.replace(/\//g, '_')}.pdf`;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 15000);
+  
+  return pdfBytes;
 }
 
 // -------------------------------------------------------------
-// TEMPLATE 1: G. AGARWAL CHAIN STYLE REPLICA
+// TEMPLATE 1: G. AGARWAL CHAIN STYLE REPLICA (Exact Vector)
 // -------------------------------------------------------------
 async function renderTemplate1(
   page: PDFPage, width: number, height: number, 
   invoice: Invoice, profile: BusinessProfile, copyLabel: string, 
-  font: PDFFont, bold: PDFFont, oblique: PDFFont, boldOblique: PDFFont, 
-  logoImage: any, invoiceDateStr: string
+  _font: PDFFont, bold: PDFFont, oblique: PDFFont, boldOblique: PDFFont, 
+  logoImage: PDFImage | null, invoiceDateStr: string
 ) {
-  void font;
-  const isChallan = invoice.type === 'DELIVERY_CHALLAN';
-  const y = (val: number) => height - val;
-  
-  // Top Header Titles
-  const title = isChallan ? 'DELIVERY CHALLAN' : 'TAX INVOICE';
-  const titleWidth = boldOblique.widthOfTextAtSize(title, 11);
-  page.drawText(title, { x: (width - titleWidth) / 2, y: y(40), size: 11, font: boldOblique, color: rgb(0,0,0) });
-  page.drawLine({ start: { x: (width - titleWidth) / 2, y: y(41) }, end: { x: (width + titleWidth) / 2, y: y(41) }, thickness: 1, color: rgb(0,0,0) });
-  
-  const copyWidth = boldOblique.widthOfTextAtSize(copyLabel, 9);
-  page.drawText(copyLabel, { x: (width - copyWidth) / 2, y: y(52), size: 9, font: boldOblique, color: rgb(0,0,0) });
+  const y = (valMm: number) => height - mm(valMm);
+  const x = (valMm: number) => mm(valMm);
 
-  page.drawText(`GSTIN: ${profile.gstin}`, { x: 40, y: y(75), size: 10, font: bold, color: rgb(0,0,0) });
-  page.drawText(`PAN NO: ${profile.pan}`, { x: 40, y: y(90), size: 10, font: bold, color: rgb(0,0,0) });
+  // Muted Professional Colors (replaced magenta/cyan/yellow per user approval)
+  const colors = {
+    headerBand: hexToRgb('#e2e8f0'), // slate-200
+    totalAmount: hexToRgb('#f8fafc'), // slate-50
+    cgstSgst: hexToRgb('#f1f5f9'), // slate-100
+    igst: hexToRgb('#f1f5f9'), // slate-100
+    roundOff: hexToRgb('#e2e8f0'), // slate-200
+    grandTotal: hexToRgb('#cbd5e1'), // slate-300
+    paymentMode: hexToRgb('#334155'), // slate-700
+    text: rgb(0,0,0),
+    paymentText: rgb(1,1,1)
+  };
+
+  // Section 2.1: Colored boxes / fills
+  page.drawRectangle({ x: x(27.0), y: y(116.2), width: mm(156.0), height: mm(14.0), color: colors.headerBand, borderColor: rgb(0,0,0), borderWidth: 1 });
   
+  // Payment mode header bar
+  page.drawRectangle({ x: x(27.0), y: y(226.9), width: mm(75.9), height: mm(4.8), color: colors.paymentMode, borderColor: rgb(0,0,0), borderWidth: 1 });
+
+  // Section 2.2: Text elements
+  page.drawText('TAX INVOICE', { x: x(94.1), y: y(19.7), size: 7.5, font: boldOblique, color: colors.text });
+  page.drawText(copyLabel, { x: x(89.1), y: y(23.6), size: 7.5, font: boldOblique, color: colors.text });
+
+  page.drawText(`GSTIN: ${profile.gstin}`, { x: x(40.9), y: y(30.3), size: 9, font: bold, color: colors.text });
   const invNoText = `INVOICE NO: ${invoice.invoiceId}`;
-  page.drawText(invNoText, { x: width - 40 - bold.widthOfTextAtSize(invNoText, 10), y: y(75), size: 10, font: bold, color: rgb(0,0,0) });
-  const dateText = `DATE: ${invoiceDateStr}`;
-  page.drawText(dateText, { x: width - 40 - bold.widthOfTextAtSize(dateText, 10), y: y(90), size: 10, font: bold, color: rgb(0,0,0) });
+  page.drawText(invNoText, { x: x(120), y: y(30.3), size: 9, font: bold, color: colors.text }); // Placed aligned to right side block
 
-  let logoBottom = y(95);
+  page.drawText(`PAN NO: ${profile.pan}`, { x: x(41.8), y: y(34.8), size: 9, font: bold, color: colors.text });
+  page.drawText(`DATE: ${invoiceDateStr}`, { x: x(120), y: y(34.8), size: 9, font: bold, color: colors.text });
+
+  // Logo (if any) placed centrally around y=50
   if (logoImage) {
-     const dims = logoImage.scale(0.35); // Approx scaled size for header
-     page.drawImage(logoImage, { x: (width - dims.width) / 2, y: y(135), width: dims.width, height: dims.height });
-     logoBottom = y(135);
+     const dims = logoImage.scaleToFit(mm(30), mm(30));
+     page.drawImage(logoImage, { x: (width - dims.width) / 2, y: y(50) + mm(15), width: dims.width, height: dims.height });
   }
 
-  // Brand Name in Green
-  const brandColor = hexToRgb('#00b050');
   const brandName = invoice.isSwappedAddress ? invoice.customerDetails.partyName.toUpperCase() : profile.brandName.toUpperCase();
-  const brandWidth = bold.widthOfTextAtSize(brandName, 20);
-  page.drawText(brandName, { x: (width - brandWidth) / 2, y: logoBottom - 20, size: 20, font: bold, color: brandColor });
+  const brandW = bold.widthOfTextAtSize(brandName, 14.5);
+  page.drawText(brandName, { x: (width - brandW) / 2, y: y(50.7), size: 14.5, font: bold, color: colors.text });
   
-  const addressText = invoice.isSwappedAddress ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}, ${invoice.customerDetails.stateName}, ${invoice.customerDetails.stateCode}` : `${profile.address}, ${profile.city}, ${profile.stateName}, ${profile.stateCode}`;
-  const addressWidth = boldOblique.widthOfTextAtSize(addressText, 10);
-  page.drawText(addressText, { x: (width - addressWidth) / 2, y: logoBottom - 38, size: 10, font: boldOblique, color: rgb(0,0,0) });
-  
+  const addressText = invoice.isSwappedAddress ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}` : `${profile.address}, ${profile.city}`;
+  const addressW = oblique.widthOfTextAtSize(addressText, 9.5);
+  page.drawText(addressText, { x: (width - addressW) / 2, y: y(57.2), size: 9.5, font: oblique, color: colors.text });
+
   const contactText = invoice.isSwappedAddress ? `CONTACT NO: ${invoice.customerDetails.phone}` : `CONTACT NO: ${profile.phone}`;
-  const contactWidth = bold.widthOfTextAtSize(contactText, 10);
-  page.drawText(contactText, { x: (width - contactWidth) / 2, y: logoBottom - 52, size: 10, font: bold, color: rgb(0,0,0) });
-  
+  const contactW = bold.widthOfTextAtSize(contactText, 9.5);
+  page.drawText(contactText, { x: (width - contactW) / 2, y: y(61.8), size: 9.5, font: bold, color: colors.text });
+
   if (!invoice.isSwappedAddress && profile.email) {
     const emailText = `EMAIL ID: ${profile.email}`;
-    const emailWidth = bold.widthOfTextAtSize(emailText, 10);
-    page.drawText(emailText, { x: (width - emailWidth) / 2, y: logoBottom - 66, size: 10, font: bold, color: rgb(0,0,0) });
+    const emailW = bold.widthOfTextAtSize(emailText, 9.5);
+    page.drawText(emailText, { x: (width - emailW) / 2, y: y(66.4), size: 9.5, font: bold, color: colors.text });
   }
 
-  // Buyer Details Box
-  const buyerY = logoBottom - 85;
-  page.drawRectangle({ x: 40, y: buyerY - 90, width: width - 80, height: 90, borderColor: rgb(0,0,0), borderWidth: 1 });
+  // Buyer Details Section
+  page.drawRectangle({ x: x(27.0), y: y(99.0), width: mm(156.0), height: mm(25.2), borderColor: rgb(0,0,0), borderWidth: 1 });
   
-  const buyerTitle = isChallan ? 'CONSIGNEE DETAILS' : 'BUYER DETAILS';
-  const btWidth = boldOblique.widthOfTextAtSize(buyerTitle, 14);
-  page.drawText(buyerTitle, { x: (width - btWidth) / 2, y: buyerY - 14, size: 14, font: boldOblique, color: rgb(0,0,0) });
-  page.drawLine({ start: { x: (width - btWidth) / 2, y: buyerY - 16 }, end: { x: (width + btWidth) / 2, y: buyerY - 16 }, thickness: 1, color: rgb(0,0,0) });
-  
+  const buyerTitle = 'BUYER DETAILS';
+  const btW = boldOblique.widthOfTextAtSize(buyerTitle, 12.5);
+  page.drawText(buyerTitle, { x: (width - btW) / 2, y: y(73.8), size: 12.5, font: boldOblique, color: colors.text });
+  page.drawLine({ start: { x: (width - btW) / 2, y: y(74.5) }, end: { x: (width + btW) / 2, y: y(74.5) }, thickness: 1, color: rgb(0,0,0) });
+
   const rName = invoice.isSwappedAddress ? profile.legalName : invoice.customerDetails.partyName;
-  const rAddress = invoice.isSwappedAddress ? `${profile.address}, ${profile.city}` : `${invoice.customerDetails.address}, ${invoice.customerDetails.city}`;
+  const rAddress = invoice.isSwappedAddress ? profile.address : invoice.customerDetails.address;
+  const rCity = invoice.isSwappedAddress ? profile.city : invoice.customerDetails.city;
   const rPhone = invoice.isSwappedAddress ? profile.phone : invoice.customerDetails.phone;
-  const rState = invoice.isSwappedAddress ? profile.stateName : invoice.customerDetails.stateName;
-  const rStateCode = invoice.isSwappedAddress ? profile.stateCode : invoice.customerDetails.stateCode;
   const rGstin = invoice.isSwappedAddress ? profile.gstin : invoice.customerDetails.gstin;
   const rPan = invoice.isSwappedAddress ? profile.pan : invoice.customerDetails.panAadhaar;
+  const rState = invoice.isSwappedAddress ? profile.stateName : invoice.customerDetails.stateName;
+  const rStateCode = invoice.isSwappedAddress ? profile.stateCode : invoice.customerDetails.stateCode;
+  const rIdType = invoice.isSwappedAddress ? 'PAN NO' : (invoice.customerDetails.idType === 'AADHAAR' ? 'AADHAAR NO' : 'PAN NO');
 
-  page.drawText(`NAME: ${rName}`, { x: 45, y: buyerY - 35, size: 10, font: bold, color: rgb(0,0,0) });
-  page.drawText(`ADDRESS: ${rAddress}`, { x: 45, y: buyerY - 55, size: 10, font: bold, color: rgb(0,0,0) });
-  page.drawText(`CONTACT NO: ${rPhone}`, { x: 45, y: buyerY - 80, size: 10, font: bold, color: rgb(0,0,0) });
+  page.drawText(`NAME: ${rName}`, { x: x(40.9), y: y(79.8), size: 10, font: bold, color: colors.text });
+  page.drawText(`ADDRESS: ${rAddress}, ${rCity}`, { x: x(40.9), y: y(84.9), size: 9.5, font: bold, color: colors.text });
+  page.drawText(`CONTACT NO: ${rPhone}`, { x: x(40.9), y: y(95.5), size: 10, font: bold, color: colors.text });
 
-  const rightAlign = width - 45;
-  const drawRight = (txt: string, yPos: number) => {
-    page.drawText(txt, { x: rightAlign - bold.widthOfTextAtSize(txt, 10), y: yPos, size: 10, font: bold, color: rgb(0,0,0) });
+  // Right side buyer details
+  const drawR = (txt: string, yPosMm: number) => {
+    page.drawText(txt, { x: x(183.0) - mm(2) - bold.widthOfTextAtSize(txt, 10), y: y(yPosMm), size: 10, font: bold, color: colors.text });
   };
-  drawRight(`GSTIN: ${rGstin}`, buyerY - 35);
-  drawRight(`PAN NO: ${rPan}`, buyerY - 50);
-  drawRight(`STATE: ${rState}`, buyerY - 65);
-  drawRight(`STATE CODE: ${rStateCode}`, buyerY - 80);
+  drawR(`GSTIN: ${rGstin}`, 79.8);
+  drawR(`${rIdType}: ${rPan}`, 84.9);
+  drawR(`STATE: ${rState}`, 90.6);
+  drawR(`STATE CODE: ${rStateCode}`, 95.5);
 
-  // Purple Header Table
-  const tableY = buyerY - 100;
-  const purpleColor = hexToRgb('#9687c7');
-  page.drawRectangle({ x: 40, y: tableY - 40, width: width - 80, height: 40, color: purpleColor, borderColor: rgb(0,0,0), borderWidth: 1 });
-  
-  const cols = [
-    { label: 'Serial No', x: 45, w: 50 },
-    { label: 'Description of Goods', x: 95, w: 180 },
-    { label: 'HSN/SAC\nCode', x: 275, w: 60, center: true },
-    { label: 'Weight\n(Gm)', x: 335, w: 60, center: true },
-    { label: 'Rate/Gram\n(Rs)', x: 395, w: 60, center: true },
-    { label: 'Amount\n(Rs)', x: 455, w: 60, center: true },
-  ];
+  // Responsive Table columns
+  const showPurity = profile.showPurityColumn ?? true;
+  let cols = [];
+  if (showPurity) {
+    cols = [
+      { label: 'Serial\nNo', x: 27.0, w: 15 },
+      { label: 'Description of Goods', x: 42.0, w: 60 },
+      { label: 'HSN/SAC\nCode', x: 102.0, w: 18, center: true },
+      { label: 'Purity', x: 120.0, w: 15, center: true },
+      { label: 'Weight\n(Gm)', x: 135.0, w: 15, center: true },
+      { label: 'Rate/Gram\n(Rs)', x: 150.0, w: 15, center: true },
+      { label: 'Amount (Rs)', x: 165.0, w: 18, center: true },
+    ];
+  } else {
+    // Distribute the 15mm from Purity mainly to Description (10mm) and rest to others
+    cols = [
+      { label: 'Serial\nNo', x: 27.0, w: 15 },
+      { label: 'Description of Goods', x: 42.0, w: 70 },
+      { label: 'HSN/SAC\nCode', x: 112.0, w: 20, center: true },
+      { label: 'Weight\n(Gm)', x: 132.0, w: 16, center: true },
+      { label: 'Rate/Gram\n(Rs)', x: 148.0, w: 17, center: true },
+      { label: 'Amount (Rs)', x: 165.0, w: 18, center: true },
+    ];
+  }
 
+  // Draw Header Labels
   cols.forEach((c) => {
     const parts = c.label.split('\n');
-    let textY = tableY - 15;
+    let textY = 105.9;
+    if (parts.length === 1) textY = 107.5;
     parts.forEach(p => {
        const tw = bold.widthOfTextAtSize(p, 9);
-       const tx = c.center ? c.x + (c.w - tw)/2 : c.x + 5;
-       page.drawText(p, { x: tx, y: textY, size: 9, font: bold, color: rgb(0,0,0) });
-       textY -= 12;
+       const tx = c.center ? x(c.x) + (mm(c.w) - tw)/2 : x(c.x) + mm(2);
+       page.drawText(p, { x: tx, y: y(textY), size: 9, font: bold, color: colors.text });
+       textY += 3.8;
     });
   });
 
-  // Table Body Items
-  const startRowY = tableY - 40;
-  const rowHeight = 230; // height of the items block
-  page.drawRectangle({ x: 40, y: startRowY - rowHeight, width: width - 80, height: rowHeight, borderColor: rgb(0,0,0), borderWidth: 1 });
-  
-  let curY = startRowY - 20;
+  // Draw Vertical Lines
+  for (let i = 1; i < cols.length; i++) {
+    page.drawLine({ start: { x: x(cols[i].x), y: y(102.1) }, end: { x: x(cols[i].x), y: y(174.9) }, thickness: 1, color: rgb(0,0,0) });
+  }
+  // Outer box for items
+  page.drawRectangle({ x: x(27.0), y: y(174.9), width: mm(156.0), height: mm(72.8), borderColor: rgb(0,0,0), borderWidth: 1 });
+
+  // Items
+  let curY = 120.3;
   invoice.items.forEach((item, idx) => {
-    const purityStr = item.purityValue !== 'None' ? ` (${item.purityValue}${item.purityType === 'Karat'?'K':'%'})` : '';
-    const desc = `${item.itemName.toUpperCase()}${purityStr}`;
+    const pStr = item.purityValue !== 'None' ? (item.purityType === 'Karat' ? `${item.purityValue}K` : `${item.purityValue}%`) : '';
+    const desc = `${item.itemName.toUpperCase()} ${pStr}`.trim();
     
-    page.drawText((idx+1).toString(), { x: cols[0].x + (cols[0].w - bold.widthOfTextAtSize((idx+1).toString(), 9))/2, y: curY, size: 9, font: bold, color: rgb(0,0,0) });
-    page.drawText(desc, { x: cols[1].x + 5, y: curY, size: 9, font: bold, color: rgb(0,0,0) });
-    page.drawText(item.hsn, { x: cols[2].x + (cols[2].w - bold.widthOfTextAtSize(item.hsn, 9))/2, y: curY, size: 9, font: bold, color: rgb(0,0,0) });
-    
-    const wStr = item.weightInGrams.toString();
-    page.drawText(wStr, { x: cols[3].x + (cols[3].w - bold.widthOfTextAtSize(wStr, 9))/2, y: curY, size: 9, font: bold, color: rgb(0,0,0) });
-    
+    let cIdx = 0;
+    // Sr No
+    page.drawText((idx+1).toString(), { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize((idx+1).toString(), 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
+    // Description
+    page.drawText(desc, { x: x(cols[cIdx].x) + mm(2), y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
+    // HSN
+    page.drawText(item.hsn, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(item.hsn, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
+    // Purity (optional)
+    if (showPurity) {
+      page.drawText(pStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(pStr, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
+    }
+    // Weight
+    const wStr = item.weight.toString();
+    page.drawText(wStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(wStr, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
+    // Rate
     const rStr = item.ratePerGram.toString();
-    page.drawText(rStr, { x: cols[4].x + (cols[4].w - bold.widthOfTextAtSize(rStr, 9))/2, y: curY, size: 9, font: bold, color: rgb(0,0,0) });
-    
+    page.drawText(rStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(rStr, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
+    // Amount
     const amtStr = item.taxableAmount.toString();
-    page.drawText(amtStr, { x: cols[5].x + (cols[5].w - bold.widthOfTextAtSize(amtStr, 9))/2, y: curY, size: 9, font: bold, color: rgb(0,0,0) });
+    page.drawText(amtStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(amtStr, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
     
-    curY -= 20;
+    curY += 5.5;
   });
 
-  // Vertical lines for table structure
-  for (let i = 1; i < cols.length; i++) {
-    page.drawLine({ start: { x: cols[i].x, y: tableY }, end: { x: cols[i].x, y: startRowY - rowHeight }, thickness: 1, color: rgb(0,0,0) });
-  }
-
-  // Colorful Totals Summary
-  const totalsY = startRowY - rowHeight;
-  const totW = 235; // Matches the table vertical dividers visually
+  // Totals Section
+  const totalTaxable = invoice.items.reduce((s, i) => s + i.taxableAmount, 0) - invoice.discountApplied;
   
-  const drawTotalRow = (label: string, val: string, bgColor: any, yPos: number) => {
-    page.drawRectangle({ x: 40, y: yPos - 20, width: totW, height: 20, color: bgColor, borderColor: rgb(0,0,0), borderWidth: 1 });
-    page.drawRectangle({ x: 40 + totW, y: yPos - 20, width: (width - 80) - totW, height: 20, color: bgColor, borderColor: rgb(0,0,0), borderWidth: 1 });
-    page.drawText(label, { x: 50, y: yPos - 14, size: 10, font: bold, color: rgb(0,0,0) });
-    page.drawText(val, { x: width - 45 - bold.widthOfTextAtSize(val, 10), y: yPos - 14, size: 10, font: bold, color: rgb(0,0,0) });
+  const drawTotRow = (label: string, val: string, bg: any, rowY: number, h: number) => {
+    page.drawRectangle({ x: x(40.4), y: y(rowY + h), width: mm(142.6), height: mm(h), color: bg, borderColor: rgb(0,0,0), borderWidth: 1 });
+    page.drawText(label, { x: x(43.2), y: y(rowY + h/2 + 1), size: 9, font: bold, color: colors.text });
+    page.drawText(val, { x: x(183.0) - mm(2) - bold.widthOfTextAtSize(val, 9), y: y(rowY + h/2 + 1), size: 9, font: bold, color: colors.text });
   };
 
-  const totalTaxable = invoice.items.reduce((s, i) => s + i.taxableAmount, 0) - invoice.discountApplied;
-  let ty = totalsY;
-  
-  drawTotalRow('TOTAL AMOUNT :', totalTaxable.toFixed(0), hexToRgb('#ff00ff'), ty); ty -= 20;
-  drawTotalRow(`CGST ${invoice.taxDetails.cgstPercent}% :`, invoice.taxDetails.cgst.toFixed(0), hexToRgb('#00ffff'), ty); ty -= 20;
-  drawTotalRow(`SGST ${invoice.taxDetails.sgstPercent}% :`, invoice.taxDetails.sgst.toFixed(0), hexToRgb('#00ffff'), ty); ty -= 20;
-  drawTotalRow(`IGST ${invoice.taxDetails.igstPercent}% :`, invoice.taxDetails.igst.toFixed(0), hexToRgb('#00ffff'), ty); ty -= 20;
+  let ty = 174.9;
+  drawTotRow('TOTAL AMOUNT :', totalTaxable.toFixed(2), colors.totalAmount, ty, 5.7); ty += 5.7;
+  drawTotRow(`CGST ${invoice.taxDetails.cgstPercent}% :`, invoice.taxDetails.cgst.toFixed(2), colors.cgstSgst, ty, 5.7); ty += 5.7;
+  drawTotRow(`SGST ${invoice.taxDetails.sgstPercent}% :`, invoice.taxDetails.sgst.toFixed(2), colors.cgstSgst, ty, 5.7); ty += 5.7;
+  drawTotRow(`IGST ${invoice.taxDetails.igstPercent}% :`, invoice.taxDetails.igst.toFixed(2), colors.igst, ty, 5.7); ty += 5.7;
   
   const roundOff = invoice.payableAmount - invoice.grandTotal;
-  drawTotalRow('ROUND OFF :', roundOff.toFixed(0), hexToRgb('#d9d9d9'), ty); ty -= 20;
-  drawTotalRow('GRAND TOTAL :', invoice.payableAmount.toFixed(0), hexToRgb('#ffff00'), ty); ty -= 20;
+  drawTotRow('ROUND OFF :', roundOff.toFixed(2), colors.roundOff, ty, 5.7); ty += 5.7;
+  
+  // Grand Total uses Helvetica Bold instead of Google Sans Mono
+  page.drawRectangle({ x: x(40.4), y: y(ty + 8.5), width: mm(142.6), height: mm(8.5), color: colors.grandTotal, borderColor: rgb(0,0,0), borderWidth: 1 });
+  page.drawText('GRAND TOTAL :', { x: x(45.9), y: y(ty + 5.5), size: 9, font: bold, color: colors.text });
+  const gtStr = invoice.payableAmount.toFixed(2);
+  page.drawText(gtStr, { x: x(183.0) - mm(2) - bold.widthOfTextAtSize(gtStr, 9), y: y(ty + 5.5), size: 9, font: bold, color: colors.text });
+  ty += 8.5;
 
   // Amount in Words
-  page.drawRectangle({ x: 40, y: ty - 25, width: width - 80, height: 25, color: hexToRgb('#d9d9d9'), borderColor: rgb(0,0,0), borderWidth: 0 });
-  const amountWords = `Amount in Words: ${numberToWords(invoice.payableAmount)}`;
-  page.drawText(amountWords, { x: 45, y: ty - 17, size: 9, font: boldOblique, color: rgb(0,0,0) });
+  page.drawRectangle({ x: x(27.0), y: y(216.7), width: mm(156.0), height: mm(5.4), color: colors.roundOff, borderColor: rgb(0,0,0), borderWidth: 1 });
+  page.drawText(`Amount in Words: ${numberToWords(invoice.payableAmount)}`, { x: x(40.9), y: y(211.3 + 3.8), size: 8, font: boldOblique, color: colors.text });
 
-  // Bank Details (Black Header)
-  const bankY = ty - 40;
-  page.drawRectangle({ x: 40, y: bankY - 15, width: 250, height: 15, color: rgb(0,0,0) });
-  const bdTxt = 'BANK DETAILS';
-  page.drawText(bdTxt, { x: 40 + (250 - bold.widthOfTextAtSize(bdTxt, 10))/2, y: bankY - 11, size: 10, font: bold, color: rgb(1,1,1) });
+  // Bank details
+  page.drawText('PAYMENT MODE', { x: x(52.2), y: y(223.1 + 3.4), size: 9, font: bold, color: colors.paymentText });
   
-  page.drawRectangle({ x: 40, y: bankY - 95, width: 250, height: 80, borderColor: rgb(0,0,0), borderWidth: 1 });
-  let bdy = bankY - 30;
-  const bLines = [
-    `BANK NAME: ${profile.bankName || ''}`,
-    `BRANCH: ${profile.branch || ''}`,
-    `ACCOUNT NAME: ${profile.accountName || ''}`,
-    `ACCOUNT NO: ${profile.accountNo || ''}`,
-    `IFSC CODE: ${profile.ifsc || ''}`
-  ];
-  bLines.forEach(l => {
-     page.drawText(l, { x: 45, y: bdy, size: 9, font: bold, color: rgb(0,0,0) });
-     bdy -= 15;
-  });
+  page.drawRectangle({ x: x(27.0), y: y(246.9), width: mm(75.9), height: mm(20.0), borderColor: rgb(0,0,0), borderWidth: 1 });
+  
+  let bdy = 227.7;
+  const drawBd = (txt: string) => {
+    page.drawText(txt, { x: x(28.0), y: y(bdy + 3.2), size: 8, font: bold, color: colors.text });
+    bdy += 4.5;
+  };
+  drawBd(`BANK NAME: ${profile.bankName || ''}`);
+  drawBd(`BRANCH: ${profile.branch || ''}`);
+  drawBd(`ACCOUNT NAME: ${profile.accountName || ''}`);
+  drawBd(`ACCOUNT NO: ${profile.accountNo || ''}`);
+  drawBd(`IFSC CODE: ${profile.ifsc || ''}`);
 
   // Footer Right Auth
-  page.drawText(`FOR ${brandName}`, { x: width - 40 - bold.widthOfTextAtSize(`FOR ${brandName}`, 10), y: bankY - 15, size: 10, font: bold, color: rgb(0,0,0) });
-  page.drawText('AUTHORISED SIGNATORY', { x: width - 40 - bold.widthOfTextAtSize('AUTHORISED SIGNATORY', 10), y: bankY - 90, size: 10, font: bold, color: rgb(0,0,0) });
+  page.drawText(`FOR ${brandName}`, { x: x(183.0) - bold.widthOfTextAtSize(`FOR ${brandName}`, 9), y: y(227.7 + 3.2), size: 9, font: bold, color: colors.text });
+  page.drawText('AUTHORISED SIGNATORY', { x: x(183.0) - bold.widthOfTextAtSize('AUTHORISED SIGNATORY', 9), y: y(253.1 + 3.2), size: 9, font: bold, color: colors.text });
 
   // EXACT Legal Text
   const jurTxt = `SUBJECT TO ${profile.jurisdiction.toUpperCase()} JURISDICTION`;
-  const jurW = bold.widthOfTextAtSize(jurTxt, 11);
-  page.drawText(jurTxt, { x: (width - jurW)/2, y: bankY - 130, size: 11, font: bold, color: rgb(0,0,0) });
-  
-  const eoeW = oblique.widthOfTextAtSize('E&OE', 10);
-  page.drawText('E&OE', { x: (width - eoeW)/2, y: bankY - 145, size: 10, font: oblique, color: rgb(0,0,0) });
+  const jurW = bold.widthOfTextAtSize(jurTxt, 9);
+  page.drawText(jurTxt, { x: (width - jurW)/2, y: y(271.5), size: 9, font: bold, color: colors.text });
 }
 
 // -------------------------------------------------------------
-// TEMPLATE 2: SRI NARAYAN JEWELLERS STYLE REPLICA
-// -------------------------------------------------------------
+// TEMPLATE 2: SRI NARAYAN JEWELLERS STYLE REPLICA (Image Overlay)
 async function renderTemplate2(
-  page: PDFPage, width: number, height: number, 
+  page: PDFPage, _width: number, height: number, 
   invoice: Invoice, profile: BusinessProfile, copyLabel: string, 
-  font: PDFFont, bold: PDFFont, oblique: PDFFont, boldOblique: PDFFont, 
-  logoImage: any, invoiceDateStr: string, financialYear: string
+  font: PDFFont, bold: PDFFont, oblique: PDFFont, _boldOblique: PDFFont, 
+  _bgImage: PDFImage | null, invoiceDateStr: string, financialYear: string
 ) {
-  void boldOblique;
-  const isChallan = invoice.type === 'DELIVERY_CHALLAN';
-  const y = (val: number) => height - val;
-  const darkBlue = hexToRgb('#0a2351');
-  const yellowCol = hexToRgb('#d6a848');
-  
-  // Left: Logo and Brand Layout
-  if (logoImage) {
-     const dims = logoImage.scale(0.4);
-     page.drawImage(logoImage, { x: 30, y: y(90), width: dims.width, height: dims.height });
+  const y = (valMm: number) => height - mm(valMm);
+  const x = (valMm: number) => mm(valMm);
+
+  const darkBlue = hexToRgb('#0a2351'); // approved navy
+  const gold = hexToRgb('#d6a848'); // approved gold
+  const white = rgb(1, 1, 1);
+  const textDark = rgb(0.1, 0.1, 0.1);
+
+  // Logo Circle or Image
+  let logoDrawn = false;
+  if (profile.logoData) {
+    try {
+      const base64Data = profile.logoData.split(',')[1];
+      const logoBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      let logoImg;
+      if (profile.logoData.startsWith('data:image/png')) {
+        logoImg = await page.doc.embedPng(logoBytes);
+      } else {
+        logoImg = await page.doc.embedJpg(logoBytes);
+      }
+      page.drawImage(logoImg, { x: x(12), y: y(30), width: mm(18), height: mm(18) });
+      logoDrawn = true;
+    } catch (e) {
+      console.error('Could not embed logo in Template 2', e);
+    }
   }
-  
+
+  if (!logoDrawn) {
+    // Draw nice circle with initials
+    page.drawCircle({ x: x(21), y: y(21), size: mm(9), color: darkBlue, borderColor: gold, borderWidth: 1.5 });
+    const initials = profile.brandName.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase();
+    const initW = bold.widthOfTextAtSize(initials, 10);
+    page.drawText(initials, { x: x(21) - initW/2, y: y(21) - 3.5, size: 10, font: bold, color: white });
+  }
+
+  // Brand Info (Left)
   const brandName = invoice.isSwappedAddress ? invoice.customerDetails.partyName.toUpperCase() : profile.brandName.toUpperCase();
-  page.drawText(brandName, { x: 90, y: y(50), size: 16, font: font, color: darkBlue }); // Non-bold clean look
-  page.drawText((profile.tagline || 'WHOLESALE & MANUFACTURERS').toUpperCase(), { x: 90, y: y(62), size: 8, font: font, color: yellowCol });
-  page.drawText(`ESTD. ${profile.estdYear}`, { x: 90, y: y(72), size: 8, font: font, color: yellowCol });
+  page.drawText(brandName, { x: x(33), y: y(15), size: 14.5, font: bold, color: darkBlue });
   
-  const phoneTxt = invoice.isSwappedAddress ? invoice.customerDetails.phone : profile.phone;
-  const emailTxt = invoice.isSwappedAddress ? '' : profile.email;
-  const addrTxt = invoice.isSwappedAddress ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}, ${invoice.customerDetails.stateName}-${invoice.customerDetails.stateCode}` : `${profile.address}, ${profile.city}, ${profile.stateName}-${profile.stateCode}`;
+  const tagStr = profile.tagline || 'WHOLESALE JEWELLERS';
+  page.drawText(tagStr, { x: x(33), y: y(19), size: 8, font: oblique, color: gold });
+  page.drawText(`ESTD: ${profile.estdYear || '2020'}`, { x: x(33), y: y(22.5), size: 7.5, font: bold, color: gold });
   
-  page.drawText(`-  ${addrTxt}`, { x: 90, y: y(86), size: 7, font: bold, color: darkBlue });
-  page.drawText(`Ph: ${phoneTxt}    Email: ${emailTxt}`, { x: 90, y: y(98), size: 7, font: bold, color: darkBlue });
+  const shopAddr = invoice.isSwappedAddress ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}` : `${profile.address}, ${profile.city}`;
+  page.drawText(shopAddr, { x: x(33), y: y(27), size: 7.5, font: font, color: textDark });
+  
+  const shopContact = invoice.isSwappedAddress ? `PH: ${invoice.customerDetails.phone}` : `PH: ${profile.phone} | EMAIL: ${profile.email}`;
+  page.drawText(shopContact, { x: x(33), y: y(30.5), size: 7.5, font: font, color: textDark });
 
-  // Right: Tax Invoice Title & Blue Box
-  const title = isChallan ? 'DELIVERY CHALLAN' : 'TAX INVOICE';
-  page.drawText(title, { x: width - 30 - font.widthOfTextAtSize(title, 20), y: y(50), size: 20, font: font, color: darkBlue });
-  
-  page.drawRectangle({ x: width - 180, y: y(72), width: 150, height: 18, color: darkBlue });
-  const copyW = font.widthOfTextAtSize(copyLabel.toUpperCase(), 8);
-  page.drawText(copyLabel.toUpperCase(), { x: width - 180 + (150 - copyW)/2, y: y(66), size: 8, font: font, color: rgb(1,1,1) });
+  // TAX INVOICE Header (Right)
+  page.drawText('TAX INVOICE', { x: x(198) - bold.widthOfTextAtSize('TAX INVOICE', 16), y: y(15), size: 16, font: bold, color: darkBlue });
 
-  let rY = y(86);
-  const drawR = (txt: string) => {
-     page.drawText(txt, { x: width - 30 - font.widthOfTextAtSize(txt, 8), y: rY, size: 8, font: font, color: rgb(0,0,0) });
-     rY -= 12;
+  // Copy Type Badge
+  page.drawRectangle({ x: x(150), y: y(23), width: mm(48), height: mm(5.5), color: darkBlue, borderColor: gold, borderWidth: 1 });
+  const copyW = bold.widthOfTextAtSize(copyLabel, 7.5);
+  page.drawText(copyLabel, { x: x(150) + (mm(48) - copyW)/2, y: y(19.2), size: 7.5, font: bold, color: gold });
+
+  // Metadata block (Right side)
+  const drawMeta = (lbl: string, val: string, yy: number) => {
+    page.drawText(lbl, { x: x(145), y: y(yy), size: 8, font: font, color: textDark });
+    page.drawText(val, { x: x(198) - bold.widthOfTextAtSize(val, 8), y: y(yy), size: 8, font: bold, color: textDark });
   };
-  drawR(`GSTIN: ${profile.gstin}`);
-  drawR(`PAN NO.: ${profile.pan}`);
-  drawR(`INVOICE NO.: ${invoice.invoiceId}`);
-  drawR(`INVOICE DATE: ${invoiceDateStr}`);
-  drawR(`FINANCIAL YEAR: ${financialYear}`);
-  drawR(`STATE CODE: ${profile.stateCode}`);
-  
-  // Full Width Dark Blue Buyer Details Header
-  const byY = y(165);
-  page.drawRectangle({ x: 30, y: byY, width: width - 60, height: 18, color: darkBlue });
-  const bdTxt = isChallan ? 'CONSIGNEE DETAILS' : 'BUYER DETAILS';
-  const bdW = font.widthOfTextAtSize(bdTxt, 10);
-  page.drawText(bdTxt, { x: (width - bdW)/2, y: byY + 5, size: 10, font: font, color: yellowCol });
-  
-  page.drawRectangle({ x: 30, y: byY - 95, width: width - 60, height: 95, borderColor: darkBlue, borderWidth: 1 });
-  
+  drawMeta('GSTIN:', profile.gstin, 27.5);
+  drawMeta('PAN NO.:', profile.pan, 31.5);
+  drawMeta('INVOICE NO.:', invoice.invoiceId, 35.5);
+  drawMeta('INVOICE DATE:', invoiceDateStr, 39.5);
+  drawMeta('FINANCIAL YEAR:', financialYear, 43.5);
+  drawMeta('STATE CODE:', profile.stateCode, 47.5);
+
+  // Separator Bar
+  page.drawRectangle({ x: x(12), y: y(51), width: mm(186), height: mm(1.2), color: darkBlue });
+
+  // Buyer Details
+  page.drawRectangle({ x: x(12), y: y(57), width: mm(186), height: mm(5.5), color: darkBlue });
+  const btW = bold.widthOfTextAtSize('BUYER DETAILS', 9.5);
+  page.drawText('BUYER DETAILS', { x: x(12) + (mm(186) - btW)/2, y: y(53.2), size: 9.5, font: bold, color: gold });
+
+  // Buyer details box border and split line
+  page.drawRectangle({ x: x(12), y: y(85), width: mm(186), height: mm(28), borderColor: darkBlue, borderWidth: 1.5 });
+  page.drawLine({ start: { x: x(105), y: y(57) }, end: { x: x(105), y: y(85) }, thickness: 1, color: darkBlue, opacity: 0.3 });
+
+  // Buyer details mapping
   const rName = invoice.isSwappedAddress ? profile.legalName : invoice.customerDetails.partyName;
   const rAddress = invoice.isSwappedAddress ? profile.address : invoice.customerDetails.address;
   const rCity = invoice.isSwappedAddress ? profile.city : invoice.customerDetails.city;
@@ -388,180 +438,225 @@ async function renderTemplate2(
   const rPan = invoice.isSwappedAddress ? profile.pan : invoice.customerDetails.panAadhaar;
   const rPos = invoice.isSwappedAddress ? profile.stateName : invoice.customerDetails.placeOfSupply;
   const rPhone = invoice.isSwappedAddress ? profile.phone : invoice.customerDetails.phone;
+  const rIdType = invoice.customerDetails.idType === 'AADHAAR' ? 'AADHAAR ID' : 'PAN ID';
 
-  // 2-Column Buyer Information
-  let leftY = byY - 20;
-  page.drawText(`NAME: `, { x: 40, y: leftY, size: 8, font: font, color: darkBlue });
-  page.drawText(rName, { x: 80, y: leftY, size: 8, font: font, color: darkBlue }); // Standard not bold for clean look
-  
-  leftY -= 20;
-  page.drawText(`CONTACT NO.: `, { x: 40, y: leftY, size: 8, font: font, color: darkBlue });
-  page.drawText(rPhone || 'NILL', { x: 105, y: leftY, size: 8, font: oblique, color: rgb(0.5,0.5,0.5) });
+  let bL = 62.5;
+  const drawBL = (lbl: string, val: string) => {
+    page.drawText(lbl, { x: x(15), y: y(bL), size: 8, font: bold, color: darkBlue });
+    page.drawText(val, { x: x(38), y: y(bL), size: 8, font: bold, color: textDark });
+    bL += 5.5;
+  };
+  drawBL('NAME:', rName);
+  drawBL('CONTACT NO:', rPhone || 'NILL');
+  drawBL('GSTIN:', rGstin || 'NILL');
+  drawBL(`${rIdType}:`, rPan || 'NILL');
 
-  leftY -= 20;
-  page.drawText(`GSTIN: `, { x: 40, y: leftY, size: 8, font: font, color: darkBlue });
-  page.drawText(rGstin, { x: 75, y: leftY, size: 8, font: font, color: rgb(0,0,0) });
+  let bR = 62.5;
+  const drawBR = (lbl: string, val: string) => {
+    page.drawText(lbl, { x: x(108), y: y(bR), size: 8, font: bold, color: darkBlue });
+    page.drawText(val, { x: x(135), y: y(bR), size: 8, font: bold, color: textDark });
+    bR += 5.5;
+  };
+  drawBR('ADDRESS:', `${rAddress}, ${rCity}`);
+  drawBR('STATE:', rState || 'NILL');
+  drawBR('STATE CODE:', rStateCode || 'NILL');
+  drawBR('POS:', rPos || 'NILL');
 
-  leftY -= 20;
-  page.drawText(`PAN ID: `, { x: 40, y: leftY, size: 8, font: font, color: darkBlue });
-  page.drawText(rPan, { x: 80, y: leftY, size: 8, font: font, color: rgb(0,0,0) });
+  // Table header bar
+  page.drawRectangle({ x: x(12), y: y(95), width: mm(186), height: mm(7), color: darkBlue });
 
-  const midX = width / 2;
-  let rightY = byY - 20;
-  page.drawText(`ADDRESS: ${rAddress}`, { x: midX, y: rightY, size: 8, font: font, color: darkBlue });
-  rightY -= 20;
-  page.drawText(`CITY: ${rCity}`, { x: midX, y: rightY, size: 8, font: font, color: darkBlue });
-  rightY -= 20;
-  page.drawText(`STATE: ${rState}`, { x: midX, y: rightY, size: 8, font: font, color: darkBlue });
-  rightY -= 20;
-  page.drawText(`STATE CODE: ${rStateCode}`, { x: midX, y: rightY, size: 8, font: font, color: darkBlue });
-  rightY -= 20;
-  page.drawText(`PLACE OF SUPPLY: ${rPos}`, { x: midX, y: rightY, size: 8, font: font, color: darkBlue });
+  const showPurity = profile.showPurityColumn ?? true;
+  let cols = [];
+  if (showPurity) {
+    cols = [
+      { label: 'SR.\nNO.', x: 12, w: 10, center: true },
+      { label: 'DESCRIPTION OF GOODS', x: 22, w: 66 },
+      { label: 'HSN/SAC\nCODE', x: 88, w: 18, center: true },
+      { label: 'PURITY\n(%)', x: 106, w: 15, center: true },
+      { label: 'WEIGHT', x: 121, w: 18, center: true },
+      { label: 'UNIT', x: 139, w: 10, center: true },
+      { label: 'RATE (Rs)', x: 149, w: 21, center: true },
+      { label: 'AMOUNT (Rs)', x: 170, w: 28, center: true },
+    ];
+  } else {
+    cols = [
+      { label: 'SR.\nNO.', x: 12, w: 10, center: true },
+      { label: 'DESCRIPTION OF GOODS', x: 22, w: 81 },
+      { label: 'HSN/SAC\nCODE', x: 103, w: 18, center: true },
+      { label: 'WEIGHT', x: 121, w: 18, center: true },
+      { label: 'UNIT', x: 139, w: 10, center: true },
+      { label: 'RATE (Rs)', x: 149, w: 21, center: true },
+      { label: 'AMOUNT (Rs)', x: 170, w: 28, center: true },
+    ];
+  }
 
-  // Blue Table Header
-  const tableY = byY - 110;
-  page.drawRectangle({ x: 30, y: tableY - 25, width: width - 60, height: 25, color: darkBlue });
-  
-  const cols = [
-    { label: 'SR.\nNO.', x: 30, w: 30, center: true },
-    { label: 'DESCRIPTION OF GOODS', x: 60, w: 190, center: true },
-    { label: 'HSN/SAC\nCODE', x: 250, w: 50, center: true },
-    { label: 'PURITY\n(%)', x: 300, w: 50, center: true },
-    { label: 'WEIGHT', x: 350, w: 50, center: true },
-    { label: 'UNIT', x: 400, w: 30, center: true },
-    { label: 'RATE (Rs)', x: 430, w: 60, center: true },
-    { label: 'AMOUNT (Rs)', x: 490, w: 75, center: true },
-  ];
-
-  cols.forEach((c) => {
+  // Draw Header text
+  cols.forEach(c => {
     const parts = c.label.split('\n');
-    let textY = tableY - 10;
-    if (parts.length === 1) textY -= 4;
+    let textY = 90.2;
+    if (parts.length === 1) textY = 92.2;
     parts.forEach(p => {
-       const tw = font.widthOfTextAtSize(p, 7);
-       const tx = c.center ? c.x + (c.w - tw)/2 : c.x + 5;
-       page.drawText(p, { x: tx, y: textY, size: 7, font: font, color: yellowCol });
-       textY -= 9;
+      const tw = bold.widthOfTextAtSize(p, 7.5);
+      const tx = c.center ? x(c.x) + (mm(c.w) - tw)/2 : x(c.x) + mm(2);
+      page.drawText(p, { x: tx, y: y(textY), size: 7.5, font: bold, color: gold });
+      textY += 3.5;
     });
   });
 
-  const rowH = 150;
-  const startRowY = tableY - 25;
-  page.drawRectangle({ x: 30, y: startRowY - rowH, width: width - 60, height: rowH, borderColor: darkBlue, borderWidth: 1 });
-  
-  let curY = startRowY - 15;
-  invoice.items.forEach((item, idx) => {
-    const pStr = item.purityValue !== 'None' ? `${item.purityValue}${item.purityType === 'Karat'?'K':''}` : '';
-    const desc = `${item.purityValue !== 'None' && item.purityType === 'Karat' ? item.purityValue + 'K ' : ''}${item.metal} ${item.itemName.toUpperCase()}`;
-    
-    page.drawText((idx+1).toString(), { x: cols[0].x + (cols[0].w - font.widthOfTextAtSize((idx+1).toString(), 8))/2, y: curY, size: 8, font: font, color: rgb(0,0,0) });
-    page.drawText(desc, { x: cols[1].x + 5, y: curY, size: 8, font: font, color: rgb(0,0,0) });
-    page.drawText(item.hsn, { x: cols[2].x + (cols[2].w - font.widthOfTextAtSize(item.hsn, 8))/2, y: curY, size: 8, font: font, color: rgb(0,0,0) });
-    page.drawText(pStr, { x: cols[3].x + (cols[3].w - font.widthOfTextAtSize(pStr, 8))/2, y: curY, size: 8, font: font, color: rgb(0,0,0) });
-    const wStr = item.weight.toFixed(2);
-    page.drawText(wStr, { x: cols[4].x + (cols[4].w - font.widthOfTextAtSize(wStr, 8))/2, y: curY, size: 8, font: font, color: rgb(0,0,0) });
-    page.drawText(item.weightUnit, { x: cols[5].x + (cols[5].w - font.widthOfTextAtSize(item.weightUnit, 8))/2, y: curY, size: 8, font: font, color: rgb(0,0,0) });
-    
-    const rStr = item.ratePerGram.toFixed(2);
-    page.drawText(rStr, { x: cols[6].x + (cols[6].w - font.widthOfTextAtSize(rStr, 8))/2, y: curY, size: 8, font: font, color: rgb(0,0,0) });
-    
-    const amtStr = item.taxableAmount.toFixed(2);
-    page.drawText(amtStr, { x: cols[7].x + (cols[7].w - font.widthOfTextAtSize(amtStr, 8))/2, y: curY, size: 8, font: bold, color: darkBlue });
-    
-    curY -= 15;
-  });
-
-  // Vertical lines
+  // Table Outer Box & Column Grid Lines
+  page.drawRectangle({ x: x(12), y: y(165), width: mm(186), height: mm(70), borderColor: darkBlue, borderWidth: 1.5 });
   for (let i = 1; i < cols.length; i++) {
-    page.drawLine({ start: { x: cols[i].x, y: tableY - 25 }, end: { x: cols[i].x, y: startRowY - rowH }, thickness: 0.5, color: darkBlue });
+    page.drawLine({ start: { x: x(cols[i].x), y: y(95) }, end: { x: x(cols[i].x), y: y(165) }, thickness: 1, color: darkBlue, opacity: 0.3 });
   }
 
-  // Totals Section
-  const totY = startRowY - rowH - 10;
-  
-  // Left side: Amount in Words box
-  page.drawRectangle({ x: 30, y: totY - 15, width: 300, height: 15, color: darkBlue });
-  page.drawText('Rs AMOUNT IN WORDS', { x: 30 + (300 - font.widthOfTextAtSize('Rs AMOUNT IN WORDS', 8))/2, y: totY - 10, size: 8, font: font, color: yellowCol });
-  
-  page.drawRectangle({ x: 30, y: totY - 45, width: 300, height: 30, borderColor: darkBlue, borderWidth: 1 });
-  page.drawText(numberToWords(invoice.payableAmount), { x: 35, y: totY - 32, size: 8, font: bold, color: darkBlue });
+  // Draw Item Rows
+  let curY = 100.5;
+  invoice.items.forEach((item, idx) => {
+    const pStr = item.purityValue !== 'None' ? (item.purityType === 'Karat' ? `${item.purityValue}K` : `${item.purityValue}%`) : '';
+    const desc = item.itemName.toUpperCase();
 
-  // Right side: Tax Breakdown Box
-  const rX = 340;
-  const rW = width - 30 - 340;
-  page.drawRectangle({ x: rX, y: totY - 15, width: rW, height: 15, color: darkBlue });
-  page.drawText('TAX BREAKDOWN', { x: rX + (rW - font.widthOfTextAtSize('TAX BREAKDOWN', 8))/2, y: totY - 10, size: 8, font: font, color: yellowCol });
-  
-  page.drawRectangle({ x: rX, y: totY - 120, width: rW, height: 105, borderColor: darkBlue, borderWidth: 1 });
-  
-  let ty = totY - 30;
-  const drawT = (lbl: string, val: string, isBld: boolean = false) => {
-     page.drawText(lbl, { x: rX + 5, y: ty, size: 8, font: isBld ? bold : font, color: rgb(0,0,0) });
-     page.drawText(val, { x: rX + rW - 5 - (isBld ? bold : font).widthOfTextAtSize(val, 8), y: ty, size: 8, font: isBld ? bold : font, color: rgb(0,0,0) });
-     ty -= 15;
-  };
-  
-  const totalTaxable = invoice.items.reduce((s, i) => s + i.taxableAmount, 0) - invoice.discountApplied;
-  drawT('TAXABLE AMOUNT', `Rs ${totalTaxable.toFixed(2)}`);
-  drawT(`CGST @ ${invoice.taxDetails.cgstPercent}%`, `Rs ${invoice.taxDetails.cgst.toFixed(2)}`);
-  drawT(`SGST @ ${invoice.taxDetails.sgstPercent}%`, `Rs ${invoice.taxDetails.sgst.toFixed(2)}`);
-  drawT('TOTAL TAX', `Rs ${(invoice.taxDetails.cgst + invoice.taxDetails.sgst + invoice.taxDetails.igst).toFixed(2)}`);
-  
-  page.drawRectangle({ x: rX, y: ty - 2, width: rW, height: 15, color: darkBlue });
-  page.drawText('GRAND TOTAL', { x: rX + 5, y: ty + 3, size: 8, font: bold, color: yellowCol });
-  const gtStr = `Rs ${invoice.grandTotal.toFixed(2)}`;
-  page.drawText(gtStr, { x: rX + rW - 5 - bold.widthOfTextAtSize(gtStr, 8), y: ty + 3, size: 8, font: bold, color: yellowCol });
-  ty -= 15;
-  
-  const roundOff = invoice.payableAmount - invoice.grandTotal;
-  drawT('ROUND OFF', `${roundOff >= 0 ? '+' : '-'} Rs ${Math.abs(roundOff).toFixed(2)}`);
-  
-  page.drawRectangle({ x: rX, y: ty - 2, width: rW, height: 15, color: yellowCol });
-  page.drawText('FINAL AMOUNT', { x: rX + 5, y: ty + 3, size: 8, font: bold, color: rgb(1,1,1) });
-  const faStr = `Rs ${invoice.payableAmount.toFixed(2)}`;
-  page.drawText(faStr, { x: rX + rW - 5 - bold.widthOfTextAtSize(faStr, 8), y: ty + 3, size: 8, font: bold, color: rgb(1,1,1) });
+    let cIdx = 0;
+    // Sr No
+    const srStr = (idx + 1).toString();
+    page.drawText(srStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - font.widthOfTextAtSize(srStr, 8.5))/2, y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    // Description
+    page.drawText(desc, { x: x(cols[cIdx].x) + mm(2), y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    // HSN
+    page.drawText(item.hsn, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - font.widthOfTextAtSize(item.hsn, 8.5))/2, y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    // Purity
+    if (showPurity) {
+      page.drawText(pStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - font.widthOfTextAtSize(pStr, 8.5))/2, y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    }
+    // Weight
+    const wStr = item.weight.toFixed(2);
+    page.drawText(wStr, { x: x(cols[cIdx].x) + mm(cols[cIdx].w) - mm(2) - font.widthOfTextAtSize(wStr, 8.5), y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    // Unit
+    page.drawText(item.weightUnit, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - font.widthOfTextAtSize(item.weightUnit, 8.5))/2, y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    // Rate
+    const rStr = item.ratePerGram.toFixed(2);
+    page.drawText(rStr, { x: x(cols[cIdx].x) + mm(cols[cIdx].w) - mm(2) - font.widthOfTextAtSize(rStr, 8.5), y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    // Amount
+    const aStr = item.taxableAmount.toFixed(2);
+    page.drawText(aStr, { x: x(cols[cIdx].x) + mm(cols[cIdx].w) - mm(2) - bold.widthOfTextAtSize(aStr, 8.5), y: y(curY), size: 8.5, font: bold, color: darkBlue });
 
-  // Bank Details
-  const bankY = totY - 135;
-  page.drawRectangle({ x: 30, y: bankY - 15, width: width - 60, height: 15, color: darkBlue });
-  const bdW2 = font.widthOfTextAtSize('BANK DETAILS', 8);
-  page.drawText('* BANK DETAILS', { x: (width - bdW2 - 15)/2, y: bankY - 10, size: 8, font: font, color: yellowCol });
-  
-  page.drawRectangle({ x: 30, y: bankY - 105, width: width - 60, height: 90, borderColor: darkBlue, borderWidth: 1 });
-  let bdy = bankY - 35;
-  const bLines = [
-    `BANK NAME: ${profile.bankName || ''}`,
-    `BRANCH: ${profile.branch || ''}`,
-    `A/C NAME: ${profile.accountName || ''}`,
-    `A/C NO.: ${profile.accountNo || ''}`,
-    `IFSC CODE: ${profile.ifsc || ''}`
-  ];
-  bLines.forEach(l => {
-     page.drawText(l, { x: 40, y: bdy, size: 8, font: font, color: darkBlue });
-     bdy -= 15;
+    curY += 5.5;
   });
 
-  // Footer text
-  const footY = bankY - 130;
-  page.drawText('- SUBJECT TO KOLKATA JURISDICTION -', { x: 30, y: footY, size: 7, font: oblique, color: rgb(0,0,0) });
-  page.drawText('E&OE', { x: 30, y: footY - 12, size: 7, font: font, color: rgb(0,0,0) });
+  // Amount In Words (Left Footer)
+  page.drawRectangle({ x: x(12), y: y(171), width: mm(103), height: mm(5), color: darkBlue });
+  const wTitle = 'AMOUNT IN WORDS';
+  const wtW = bold.widthOfTextAtSize(wTitle, 8);
+  page.drawText(wTitle, { x: x(12) + (mm(103) - wtW)/2, y: y(167.5), size: 8, font: bold, color: gold });
 
-  const fsRight = `FOR ${brandName}`;
-  page.drawText(fsRight, { x: width - 30 - font.widthOfTextAtSize(fsRight, 8), y: footY, size: 8, font: font, color: rgb(0,0,0) });
-  
-  page.drawLine({ start: { x: width - 150, y: footY - 45 }, end: { x: width - 30, y: footY - 45 }, thickness: 0.5, color: rgb(0.5,0.5,0.5) });
-  const authTxt = invoice.isSwappedAddress ? profile.legalName.toUpperCase() : brandName;
-  page.drawText(authTxt, { x: width - 30 - oblique.widthOfTextAtSize(authTxt, 8), y: footY - 55, size: 8, font: oblique, color: rgb(0,0,0) });
-  page.drawText('AUTHORISED SIGNATORY', { x: width - 30 - font.widthOfTextAtSize('AUTHORISED SIGNATORY', 7), y: footY - 65, size: 7, font: font, color: rgb(0,0,0) });
+  page.drawRectangle({ x: x(12), y: y(190), width: mm(103), height: mm(19), borderColor: darkBlue, borderWidth: 1.5 });
+  const wordStr = numberToWords(invoice.payableAmount);
+  // Split words if too long to fit
+  if (bold.widthOfTextAtSize(wordStr, 8.5) > mm(99)) {
+    const mid = Math.floor(wordStr.length / 2);
+    const splitIdx = wordStr.indexOf(' ', mid);
+    const line1 = wordStr.substring(0, splitIdx);
+    const line2 = wordStr.substring(splitIdx + 1);
+    page.drawText(line1, { x: x(15), y: y(176.5), size: 8.5, font: bold, color: darkBlue });
+    page.drawText(line2, { x: x(15), y: y(183.5), size: 8.5, font: bold, color: darkBlue });
+  } else {
+    page.drawText(wordStr, { x: x(15), y: y(180), size: 8.5, font: bold, color: darkBlue });
+  }
 
-  // Bottom Banner
-  const botY = 30;
-  page.drawRectangle({ x: 30, y: botY, width: width - 60, height: 20, color: darkBlue });
-  page.drawText('THANK YOU FOR YOUR BUSINESS!', { x: 40, y: botY + 7, size: 7, font: font, color: rgb(1,1,1) });
+  // Tax Breakdown (Right Footer)
+  page.drawRectangle({ x: x(120), y: y(171), width: mm(78), height: mm(5), color: darkBlue });
+  const tbW = bold.widthOfTextAtSize('TAX BREAKDOWN', 8);
+  page.drawText('TAX BREAKDOWN', { x: x(120) + (mm(78) - tbW)/2, y: y(167.5), size: 8, font: bold, color: gold });
+
+  page.drawRectangle({ x: x(120), y: y(222), width: mm(78), height: mm(51), borderColor: darkBlue, borderWidth: 1.5 });
+
+  let tY = 175.5;
+  const drawRow = (lbl: string, val: string, isBold: boolean = false) => {
+    page.drawText(lbl, { x: x(123), y: y(tY), size: 8, font: isBold ? bold : font, color: textDark });
+    page.drawText(val, { x: x(195) - (isBold ? bold : font).widthOfTextAtSize(val, 8), y: y(tY), size: 8, font: isBold ? bold : font, color: textDark });
+    page.drawLine({ start: { x: x(120), y: y(tY + 3) }, end: { x: x(198), y: y(tY + 3) }, thickness: 0.5, color: darkBlue, opacity: 0.2 });
+    tY += 5;
+  };
+
+  const totalTaxable = invoice.items.reduce((s, i) => s + i.taxableAmount, 0) - invoice.discountApplied;
+  drawRow('TAXABLE AMOUNT', totalTaxable.toFixed(2));
+  drawRow(`CGST @ ${invoice.taxDetails.cgstPercent}%`, invoice.taxDetails.cgst.toFixed(2));
+  drawRow(`SGST @ ${invoice.taxDetails.sgstPercent}%`, invoice.taxDetails.sgst.toFixed(2));
+  if (invoice.taxDetails.igst > 0) {
+    drawRow(`IGST @ ${invoice.taxDetails.igstPercent}%`, invoice.taxDetails.igst.toFixed(2));
+  }
+  const totalTax = invoice.taxDetails.cgst + invoice.taxDetails.sgst + invoice.taxDetails.igst;
+  drawRow('TOTAL TAX', totalTax.toFixed(2));
+
+  // Grand Total Bar
+  page.drawRectangle({ x: x(120), y: y(206.5), width: mm(78), height: mm(5.5), color: darkBlue });
+  page.drawText('GRAND TOTAL', { x: x(123), y: y(202.5), size: 8, font: bold, color: gold });
+  const gtStr = invoice.grandTotal.toFixed(2);
+  page.drawText(gtStr, { x: x(195) - bold.widthOfTextAtSize(gtStr, 8), y: y(202.5), size: 8, font: bold, color: gold });
+
+  tY = 211.5;
+  const roundOff = invoice.payableAmount - invoice.grandTotal;
+  drawRow('ROUND OFF', `${roundOff >= 0 ? '+' : '-'}${Math.abs(roundOff).toFixed(2)}`);
+
+  // Final Amount Bar
+  page.drawRectangle({ x: x(120), y: y(222), width: mm(78), height: mm(5.5), color: gold });
+  page.drawText('FINAL AMOUNT', { x: x(123), y: y(218.2), size: 8, font: bold, color: white });
+  const faStr = invoice.payableAmount.toFixed(2);
+  page.drawText(faStr, { x: x(195) - bold.widthOfTextAtSize(faStr, 8), y: y(218.2), size: 8, font: bold, color: white });
+
+  // Bank Details (Left Footer Box 2)
+  page.drawRectangle({ x: x(12), y: y(197), width: mm(103), height: mm(5), color: darkBlue });
+  const bdTitle = 'BANK DETAILS';
+  const bdtW = bold.widthOfTextAtSize(bdTitle, 8);
+  page.drawText(bdTitle, { x: x(12) + (mm(103) - bdtW)/2, y: y(193.5), size: 8, font: bold, color: gold });
+
+  page.drawRectangle({ x: x(12), y: y(229), width: mm(103), height: mm(32), borderColor: darkBlue, borderWidth: 1.5 });
+  let bdY = 202.5;
+  const drawBD = (lbl: string, val: string) => {
+    page.drawText(lbl, { x: x(15), y: y(bdY), size: 7.5, font: bold, color: darkBlue });
+    page.drawText(val, { x: x(38), y: y(bdY), size: 7.5, font: bold, color: textDark });
+    bdY += 4.5;
+  };
+  drawBD('BANK NAME:', profile.bankName || '');
+  drawBD('BRANCH:', profile.branch || '');
+  drawBD('A/C NAME:', profile.accountName || '');
+  drawBD('A/C NO.:', profile.accountNo || '');
+  drawBD('IFSC CODE:', profile.ifsc || '');
+  drawBD('UPI ID:', profile.upiId || '');
+
+  // Payment Mode Box (Right side, below Final Amount)
+  page.drawRectangle({ x: x(120), y: y(229), width: mm(78), height: mm(5), color: darkBlue });
+  const pmTitle = 'PAYMENT MODE';
+  const pmW = bold.widthOfTextAtSize(pmTitle, 8);
+  page.drawText(pmTitle, { x: x(120) + (mm(78) - pmW)/2, y: y(225.5), size: 8, font: bold, color: gold });
+
+  page.drawRectangle({ x: x(120), y: y(244), width: mm(78), height: mm(15), borderColor: darkBlue, borderWidth: 1.5 });
+  page.drawText(invoice.paymentMode || 'NILL', { x: x(123), y: y(235.5), size: 8.5, font: bold, color: textDark });
+
+  // Signature Block & E&OE
+  page.drawText(`SUBJECT TO ${profile.jurisdiction.toUpperCase() || 'KOLKATA'} JURISDICTION`, { x: x(12), y: y(251), size: 8, font: oblique, color: textDark });
+  page.drawText('E&OE', { x: x(12), y: y(256), size: 9, font: bold, color: textDark });
+
+  // FOR [Business Name]
+  const forStr = `FOR ${profile.brandName.toUpperCase()}`;
+  page.drawText(forStr, { x: x(198) - bold.widthOfTextAtSize(forStr, 8.5), y: y(251), size: 8.5, font: bold, color: textDark });
+
+  if (profile.legalName) {
+    page.drawText(profile.legalName, { x: x(198) - oblique.widthOfTextAtSize(profile.legalName, 8.5), y: y(268), size: 8.5, font: oblique, color: textDark });
+  }
+  page.drawText('AUTHORISED SIGNATORY', { x: x(198) - bold.widthOfTextAtSize('AUTHORISED SIGNATORY', 8), y: y(272), size: 8, font: bold, color: textDark });
+
+  // Decorative gold line
+  page.drawLine({ start: { x: x(12), y: y(276.5) }, end: { x: x(198), y: y(276.5) }, thickness: 1.5, color: gold });
+
+  // Footer branding bar
+  page.drawRectangle({ x: x(12), y: y(287), width: mm(186), height: mm(9), color: darkBlue });
   
-  const trustTxt = 'TRUSTED FOR PURITY. COMMITTED TO EXCELLENCE.';
-  page.drawText(trustTxt, { x: width - 40 - font.widthOfTextAtSize(trustTxt, 7), y: botY + 7, size: 7, font: font, color: yellowCol });
-  
-  // Center diamond
-  page.drawText('*', { x: (width - 10)/2, y: botY + 7, size: 8, font: font, color: yellowCol });
+  const foot1 = 'THANK YOU FOR YOUR BUSINESS!';
+  page.drawText(foot1, { x: x(15), y: y(281.5), size: 8, font: bold, color: gold });
+
+  // Draw a gold separator dot
+  page.drawCircle({ x: x(12) + mm(186)/2, y: y(282.5), size: mm(1), color: gold });
+
+  const foot2 = 'TRUSTED FOR PURITY. COMMITTED TO EXCELLENCE.';
+  page.drawText(foot2, { x: x(195) - bold.widthOfTextAtSize(foot2, 8), y: y(281.5), size: 8, font: bold, color: gold });
 }

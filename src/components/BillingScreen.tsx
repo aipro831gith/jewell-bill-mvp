@@ -187,7 +187,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
             updated.purityValue = '22K916';
           } else {
             updated.itemName = 'Silver Ornaments';
-            updated.hsn = '711311';
+            updated.hsn = '711319';
             updated.purityType = 'Karat';
             updated.purityValue = '18K750';
           }
@@ -196,11 +196,11 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
           const hsnMap: Record<string, string> = {
             'Gold Ornaments': '711319',
             'Pure Gold Bullion': '710812',
-            'Gold Alloy': '710813',
+            'Gold Alloy Ornament': '711319',
             'Goldsmiths Wares': '711419',
-            'Silver Ornaments': '711311',
+            'Silver Ornaments': '711319',
             'Pure Silver Bullion': '710691',
-            'Silver Alloy': '710692',
+            'Silver Alloy Ornament': '711319',
             'Silversmiths Wares': '711411'
           };
           updated.hsn = hsnMap[value] || '';
@@ -210,8 +210,22 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         if (field === 'purityType') {
           if (value === 'Karat') {
             updated.purityValue = '22K916';
+            if (updated.metal === 'GOLD') {
+              updated.itemName = 'Gold Ornaments';
+              updated.hsn = '711319';
+            } else {
+              updated.itemName = 'Silver Ornaments';
+              updated.hsn = '711319';
+            }
           } else {
             updated.purityValue = '91.6';
+            if (updated.metal === 'GOLD') {
+              updated.itemName = 'Gold Alloy Ornament';
+              updated.hsn = '711319';
+            } else {
+              updated.itemName = 'Silver Alloy Ornament';
+              updated.hsn = '711319';
+            }
           }
         }
 
@@ -674,8 +688,12 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                       <th className="pb-2">Metal</th>
                       <th className="pb-2">Description</th>
                       <th className="pb-2">HSN</th>
-                      <th className="pb-2">Purity System</th>
-                      <th className="pb-2">Purity Value</th>
+                      {(profile.showPurityColumn ?? true) && (
+                        <>
+                          <th className="pb-2">Purity System</th>
+                          <th className="pb-2">Purity Value</th>
+                        </>
+                      )}
                       <th className="pb-2">Weight</th>
                       <th className="pb-2">Unit</th>
                       <th className="pb-2">Rate/g</th>
@@ -706,14 +724,14 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                               <>
                                 <option value="Gold Ornaments">Gold Ornaments</option>
                                 <option value="Pure Gold Bullion">Pure Gold Bullion</option>
-                                <option value="Gold Alloy">Gold Alloy</option>
+                                <option value="Gold Alloy Ornament">Gold Alloy Ornament</option>
                                 <option value="Goldsmiths Wares">Goldsmiths Wares</option>
                               </>
                             ) : (
                               <>
                                 <option value="Silver Ornaments">Silver Ornaments</option>
                                 <option value="Pure Silver Bullion">Pure Silver Bullion</option>
-                                <option value="Silver Alloy">Silver Alloy</option>
+                                <option value="Silver Alloy Ornament">Silver Alloy Ornament</option>
                                 <option value="Silversmiths Wares">Silversmiths Wares</option>
                               </>
                             )}
@@ -727,45 +745,49 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                             className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-400 focus:outline-none w-16 text-center font-mono"
                           />
                         </td>
-                        <td className="py-2.5 pr-2">
-                          <select
-                            value={item.purityType}
-                            onChange={(e) => handleItemFieldChange(item.id, 'purityType', e.target.value)}
-                            className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
-                          >
-                            <option value="Karat">Karat</option>
-                            <option value="Percentage (%)">Percentage (%)</option>
-                          </select>
-                        </td>
-                        <td className="py-2.5 pr-2">
-                          {item.purityType === 'Karat' ? (
-                            <select
-                              value={item.purityValue}
-                              onChange={(e) => handleItemFieldChange(item.id, 'purityValue', e.target.value)}
-                              className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
-                            >
-                              <option value="None">None</option>
-                              <option value="24K995">24K995</option>
-                              <option value="23K958">23K958</option>
-                              <option value="22K916">22K916</option>
-                              <option value="20K833">20K833</option>
-                              <option value="18K750">18K750</option>
-                              <option value="14K585">14K585</option>
-                              <option value="9K375">9K375</option>
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              placeholder="0.0"
-                              value={item.purityValue === 'None' ? '' : item.purityValue}
-                              onChange={(e) => {
-                                const clean = e.target.value.replace(/[^0-9.]/g, '');
-                                handleItemFieldChange(item.id, 'purityValue', clean || '0');
-                              }}
-                              className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 w-14"
-                            />
-                          )}
-                        </td>
+                        {(profile.showPurityColumn ?? true) && (
+                          <>
+                            <td className="py-2.5 pr-2">
+                              <select
+                                value={item.purityType}
+                                onChange={(e) => handleItemFieldChange(item.id, 'purityType', e.target.value)}
+                                className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                              >
+                                <option value="Karat">Standard Purity (Karat)</option>
+                                <option value="Percentage (%)">Alloy (Percentage)</option>
+                              </select>
+                            </td>
+                            <td className="py-2.5 pr-2">
+                              {item.purityType === 'Karat' ? (
+                                <select
+                                  value={item.purityValue}
+                                  onChange={(e) => handleItemFieldChange(item.id, 'purityValue', e.target.value)}
+                                  className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
+                                >
+                                  <option value="None">None</option>
+                                  <option value="24K995">24K995</option>
+                                  <option value="23K958">23K958</option>
+                                  <option value="22K916">22K916</option>
+                                  <option value="20K833">20K833</option>
+                                  <option value="18K750">18K750</option>
+                                  <option value="14K585">14K585</option>
+                                  <option value="9K375">9K375</option>
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  placeholder="0.0"
+                                  value={item.purityValue === 'None' ? '' : item.purityValue}
+                                  onChange={(e) => {
+                                    const clean = e.target.value.replace(/[^0-9.]/g, '');
+                                    handleItemFieldChange(item.id, 'purityValue', clean || '0');
+                                  }}
+                                  className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 w-14"
+                                />
+                              )}
+                            </td>
+                          </>
+                        )}
                         <td className="py-2.5 pr-2">
                           <input
                             type="text"
