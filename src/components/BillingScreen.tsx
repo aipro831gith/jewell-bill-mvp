@@ -210,7 +210,6 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   const handleAddItem = () => {
     setCustomPayableAmount(null);
     setDiscountApplied(0);
-    setTargetTotalInput('');
     const newItem: InvoiceItem = {
       id: Math.random().toString(36).substring(2, 9),
       metal: 'GOLD',
@@ -230,14 +229,12 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   const handleRemoveItem = (id: string) => {
     setCustomPayableAmount(null);
     setDiscountApplied(0);
-    setTargetTotalInput('');
     setItems(prev => prev.filter(item => item.id !== id));
   };
 
   const handleItemFieldChange = (id: string, field: keyof InvoiceItem, value: any) => {
     setCustomPayableAmount(null);
     setDiscountApplied(0);
-    setTargetTotalInput('');
     setItems(prev => prev.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
