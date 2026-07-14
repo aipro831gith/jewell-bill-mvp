@@ -131,6 +131,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Card' | 'Bank Transfer' | 'UPI' | 'RTGS' | 'None'>('None');
   const [customPayableAmount, setCustomPayableAmount] = useState<number | null>(null);
   const [targetTotalInput, setTargetTotalInput] = useState('');
+  const [showTargetInput, setShowTargetInput] = useState(false);
   
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
@@ -165,6 +166,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       phone: c.phone,
       address: c.address,
       city: c.city,
+      zipCode: c.zipCode || '',
       stateName: c.stateName,
       stateCode: c.stateCode,
       idType: c.panAadhaar.length === 12 ? 'AADHAAR' : 'PAN',
@@ -172,6 +174,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       gstin: c.gstin || '',
       shippingAddress: c.shippingAddress || '',
       shippingCity: c.shippingCity || '',
+      shippingZipCode: c.shippingZipCode || '',
       shippingStateName: c.shippingStateName || '',
       shippingStateCode: c.shippingStateCode || ''
     });
@@ -1106,25 +1109,57 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
 
             {/* Target override inline */}
             <div className="mt-4 pt-4 border-t border-zinc-850">
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Target Total Negotiated Override</label>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  placeholder="e.g. 59600"
-                  value={targetTotalInput}
-                  onChange={(e) => {
-                    const clean = e.target.value.replace(/[^0-9]/g, '');
-                    setTargetTotalInput(clean);
-                  }}
-                  className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-indigo-400 font-bold focus:outline-none focus:border-indigo-500 placeholder-zinc-700"
-                />
-                <button
-                  onClick={handlePayableAmountOverride}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center font-bold text-sm"
-                >
-                  Apply
-                </button>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Target Total Negotiated Override</label>
+                {!showTargetInput && (
+                  <button onClick={() => setShowTargetInput(true)} className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">
+                    + ADD OVERRIDE
+                  </button>
+                )}
               </div>
+              {showTargetInput && (
+                <div 
+                  className="flex space-x-2"
+                  onBlur={(e) => {
+                    // Hide when focus leaves the input and apply button
+                    if (!e.currentTarget.contains(e.relatedTarget)) {
+                      if (!customPayableAmount) {
+                        setShowTargetInput(false);
+                        setTargetTotalInput('');
+                      }
+                    }
+                  }}
+                >
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="e.g. 59600"
+                    value={targetTotalInput}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/[^0-9]/g, '');
+                      setTargetTotalInput(clean);
+                    }}
+                    className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-indigo-400 font-bold focus:outline-none focus:border-indigo-500 placeholder-zinc-700"
+                  />
+                  <button
+                    onClick={handlePayableAmountOverride}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center font-bold text-sm"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowTargetInput(false);
+                      setTargetTotalInput('');
+                      setCustomPayableAmount(null);
+                      setDiscountApplied(0);
+                    }}
+                    className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-3 py-2 rounded-lg transition-colors flex items-center justify-center font-bold text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
