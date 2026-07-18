@@ -430,7 +430,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
         const gstDivisor = 1 + (totalGstPercent / 100);
         
         const targetTaxable = target / gstDivisor;
-        const calculatedWeight = toFixed3(targetTaxable / firstItemWithRate.ratePerGram);
+        const calculatedWeight = toFixed2(targetTaxable / firstItemWithRate.ratePerGram);
         
         itemsForReverse = items.map(item => {
           if (item.id === firstItemWithRate.id) {
