@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { saveProfile } from '../db/database';
 import type { BusinessProfile } from '../db/database';
-import { ShieldCheck, Upload, Loader2, Sparkles, Building, Landmark, QrCode } from 'lucide-react';
+import { ShieldCheck, Upload, Loader2, Sparkles, Building, Landmark, QrCode, Trash2 } from 'lucide-react';
 
 export const INDIAN_STATES = [
   { name: 'Andhra Pradesh', code: '37' },
@@ -75,7 +75,6 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
       email: '',
       jurisdiction: 'Kolkata',
       templateId: 1,
-      showPurityColumn: true,
       bankName: '',
       branch: '',
       accountName: '',
@@ -90,7 +89,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
   const [compressingQr, setCompressingQr] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const compressImage = (file: File, maxSizeKB: number, callback: (base64: string) => void) => {
+  const compressImage = (file: File, _minSizeKB: number, maxSizeKB: number, callback: (base64: string) => void) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -99,34 +98,39 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        let MAX_DIM = 600;
         let base64 = '';
+        // Start at natural size or 1000px, whichever is smaller, to preserve quality
+        let current_dim = Math.min(Math.max(img.width, img.height), 1000);
+        let min_dim = 100;
         
-        while (MAX_DIM > 100) {
+        for (let i = 0; i < 15; i++) {
           let w = img.width;
           let h = img.height;
-          if (w > MAX_DIM || h > MAX_DIM) {
-            if (w > h) {
-              h = Math.round((h * MAX_DIM) / w);
-              w = MAX_DIM;
-            } else {
-              w = Math.round((w * MAX_DIM) / h);
-              h = MAX_DIM;
-            }
+          
+          if (w > h) {
+            h = Math.max(1, Math.round((h * current_dim) / w));
+            w = current_dim;
+          } else {
+            w = Math.max(1, Math.round((w * current_dim) / h));
+            h = current_dim;
           }
+          
           canvas.width = w;
           canvas.height = h;
           ctx.clearRect(0, 0, w, h);
           ctx.drawImage(img, 0, 0, w, h);
           
-          // Use PNG to preserve transparency
+          // Use PNG to preserve transparency unconditionally
           base64 = canvas.toDataURL('image/png');
           const sizeKB = (base64.length * 3) / 4 / 1024;
           
-          if (sizeKB <= maxSizeKB) {
+          if (sizeKB > maxSizeKB) {
+            current_dim = Math.round((current_dim + min_dim) / 2);
+          } else {
+            // Under max size! We can stop immediately since we don't force a minimum size.
+            // (Forcing a minimum size creates infinite loops on simple/small images).
             break;
           }
-          MAX_DIM = Math.round(MAX_DIM * 0.8);
         }
         callback(base64);
       };
@@ -139,7 +143,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
     const file = e.target.files?.[0];
     if (file) {
       setCompressingLogo(true);
-      compressImage(file, 300, (base64) => {
+      compressImage(file, 20, 200, (base64) => {
         setFormData(prev => ({ ...prev, logoData: base64 }));
         setCompressingLogo(false);
       });
@@ -150,7 +154,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
     const file = e.target.files?.[0];
     if (file) {
       setCompressingQr(true);
-      compressImage(file, 300, (base64) => {
+      compressImage(file, 0, 300, (base64) => {
         setFormData(prev => ({ ...prev, qrCodeData: base64 }));
         setCompressingQr(false);
       });
@@ -253,7 +257,7 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                   <div className="flex flex-col items-center text-center">
                     <Upload className="h-8 w-8 text-zinc-400 mb-2" />
                     <span className="text-xs text-zinc-300 font-medium">Upload Logo</span>
-                    <span className="text-[10px] text-zinc-500 mt-1">PNG/JPG (Auto-compress &lt;100KB)</span>
+                    <span className="text-[10px] text-zinc-500 mt-1">PNG/JPG (Auto-compress 20-200KB)</span>
                   </div>
                 )}
               </div>
@@ -595,21 +599,6 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                 />
               </div>
             </div>
-            <div className="mt-6 border-t border-zinc-800 pt-6 flex items-center justify-between">
-              <div>
-                <label className="block text-sm font-semibold text-zinc-200">Show Purity Column</label>
-                <p className="text-xs text-zinc-400 mt-1">Enable this to show the Purity column in your invoices. When disabled, other columns will stretch to fill the space.</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={formData.showPurityColumn ?? true}
-                  onChange={(e) => setFormData(prev => ({ ...prev, showPurityColumn: e.target.checked }))}
-                />
-                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
-              </label>
-            </div>
           </div>
 
           {/* Section 3: Bank & UPI (Optional Group) */}
@@ -699,11 +688,24 @@ export const BusinessProfileSetup: React.FC<BusinessProfileSetupProps> = ({ onSe
                   {compressingQr ? (
                     <Loader2 className="h-6 w-6 text-indigo-500 animate-spin" />
                   ) : formData.qrCodeData ? (
-                    <img
-                      src={formData.qrCodeData}
-                      alt="UPI QR Preview"
-                      className="max-h-28 object-contain rounded"
-                    />
+                    <>
+                      <img
+                        src={formData.qrCodeData}
+                        alt="UPI QR Preview"
+                        className="max-h-28 object-contain rounded"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setFormData(prev => ({ ...prev, qrCodeData: '' }));
+                        }}
+                        className="absolute top-1 right-1 bg-red-500/80 p-1.5 rounded-full text-white hover:bg-red-500 transition-colors z-10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
                   ) : (
                     <div className="flex flex-col items-center text-center">
                       <QrCode className="h-6 w-6 text-zinc-400 mb-1" />

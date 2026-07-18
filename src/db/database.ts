@@ -55,6 +55,7 @@ export interface InvoiceItem {
   id: string;
   metal: 'GOLD' | 'SILVER';
   itemName: string;
+  itemSubName?: string;
   hsn: string;
   purityType: 'Karat' | 'Percentage (%)' | 'None';
   purityValue: string; // e.g. "22K916" or "91.6" or "None"
@@ -209,7 +210,8 @@ export async function searchCustomers(query: string): Promise<Customer[]> {
   const lowercaseQuery = query.toLowerCase();
   return allCustomers.filter((c) =>
     c.partyName.toLowerCase().split(' ').some(word => word.startsWith(lowercaseQuery)) ||
-    c.phone.startsWith(lowercaseQuery)
+    c.phone.startsWith(lowercaseQuery) ||
+    (c.address && c.address.toLowerCase().includes(lowercaseQuery))
   );
 }
 
@@ -243,8 +245,17 @@ export async function getInvoice(invoiceId: string): Promise<Invoice | undefined
   return await db.get('Invoices', invoiceId);
 }
 
+export async function deleteInvoice(invoiceId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('Invoices', invoiceId);
+}
+
 export async function saveInvoice(invoice: Invoice): Promise<string> {
   const db = await getDB();
+  const existing = await db.get('Invoices', invoice.invoiceId);
+  if (existing) {
+    throw new Error(`Invoice with ID ${invoice.invoiceId} already exists. Please use a unique Invoice ID.`);
+  }
   await db.put('Invoices', invoice);
   
   const customerToSave: Omit<Customer, 'id'> = {

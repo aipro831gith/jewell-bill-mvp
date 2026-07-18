@@ -161,6 +161,7 @@ function App() {
           onSwitchProfile={handleSwitchProfile}
           onDeleteProfile={handleDeleteProfile}
           onLogOut={handleLogOut}
+          onInvoiceDeleted={refreshData}
         />
       )}
 

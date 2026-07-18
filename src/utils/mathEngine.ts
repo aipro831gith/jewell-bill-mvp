@@ -105,65 +105,68 @@ export function applyReverseCalculation(
   const totalGstPercent = cgstPercent + sgstPercent + igstPercent;
   const gstDivisor = 1 + (totalGstPercent / 100);
 
-  // Target Taxable Amount: Target Total / gstDivisor
+  // 1. Base Target
   const targetTaxable = targetTotal / gstDivisor;
+
+  // 2. Base Rate (Standard Round to 2 decimals)
   const exactRate = targetTaxable / totalWeightInGrams;
+  const baseRate = toFixed2(exactRate);
 
-  // Helper to test if a given 2-decimal rate hits the target exactly without discount
-  const testExactRate = (rateToTest: number): boolean => {
-    let subtotal = 0;
-    items.forEach(item => {
-      subtotal = toFixed2(subtotal + toFixed2(item.weightInGrams * rateToTest));
-    });
-    let cgst = 0, sgst = 0, igst = 0;
-    if (isLocal) {
-      cgst = toFixed2(subtotal * 0.015);
-      sgst = toFixed2(subtotal * 0.015);
-    } else {
-      igst = toFixed2(subtotal * 0.03);
-    }
-    const rawTotal = toFixed2(subtotal + cgst + sgst + igst);
-    return Math.ceil(rawTotal) === targetTotal;
-  };
-
-  // Smart Rate Finder: Test rates around the mathematical exact rate (e.g. +/- 0.05)
-  // We check in order of proximity to exactRate.
-  const baseRate = Math.floor(exactRate * 100) / 100; // Floor to 2 decimals
-  const offsets = [
-    0, 0.01, -0.01, 0.02, -0.02, 0.03, -0.03, 
-    0.04, -0.04, 0.05, -0.05, 0.06, -0.06, 0.07, -0.07
-  ];
-
-  let perfectRate: number | null = null;
-  for (const offset of offsets) {
-    const rateToTest = toFixed2(baseRate + offset);
-    if (rateToTest > 0 && testExactRate(rateToTest)) {
-      perfectRate = rateToTest;
-      break;
-    }
-  }
-
-  // If a perfect rate was found that requires NO discount
-  if (perfectRate !== null) {
-    return {
-      updatedItems: items.map((item) => ({ id: item.id, ratePerGram: perfectRate! })),
-      discountApplied: 0,
-    };
-  }
-
-  // Fallback: If no perfect rate exists due to granularity limits, use ceil and calculate a tiny discount
-  const adjustedRate = toFixed2(Math.ceil(exactRate * 100) / 100);
-  
-  let newSubtotal = 0;
+  // 3. Simulate Forward Math
+  let simulatedSubtotal = 0;
   items.forEach(item => {
-    newSubtotal = toFixed2(newSubtotal + toFixed2(item.weightInGrams * adjustedRate));
+    simulatedSubtotal = toFixed2(simulatedSubtotal + toFixed2(item.weightInGrams * baseRate));
   });
-  
-  // We aim for exactly targetTotal / gstDivisor
-  const discountBoxValue = Math.max(0, toFixed2(newSubtotal - targetTaxable));
+
+  let simulatedGst = 0;
+  if (isLocal) {
+    simulatedGst = toFixed2(simulatedSubtotal * 0.015) + toFixed2(simulatedSubtotal * 0.015);
+  } else {
+    simulatedGst = toFixed2(simulatedSubtotal * 0.03);
+  }
+  const simulatedRawTotal = toFixed2(simulatedSubtotal + simulatedGst);
+  const simulatedPayable = Math.ceil(simulatedRawTotal);
+
+  let finalRate = baseRate;
+  let discountApplied = 0;
+
+  // 4. Resolution Logic
+  if (simulatedPayable === targetTotal) {
+    discountApplied = 0;
+  } else if (simulatedPayable > targetTotal) {
+    // Over-Match
+    const difference = simulatedPayable - targetTotal;
+    discountApplied = toFixed2(difference / gstDivisor);
+  } else {
+    // Under-Match (Simulated Payable < Target)
+    const shortfall = targetTotal - simulatedPayable;
+    const exactRateBump = (shortfall / gstDivisor) / totalWeightInGrams;
+    const safeRateBump = Number(exactRateBump.toFixed(6));
+    const roundedRateBump = Math.ceil(safeRateBump * 100) / 100;
+    
+    finalRate = toFixed2(baseRate + roundedRateBump);
+    
+    // Simulate again with finalRate to find required discount for overshoot
+    let newSubtotal = 0;
+    items.forEach(item => {
+      newSubtotal = toFixed2(newSubtotal + toFixed2(item.weightInGrams * finalRate));
+    });
+    
+    let newGst = 0;
+    if (isLocal) {
+      newGst = toFixed2(newSubtotal * 0.015) + toFixed2(newSubtotal * 0.015);
+    } else {
+      newGst = toFixed2(newSubtotal * 0.03);
+    }
+    const newRawTotal = toFixed2(newSubtotal + newGst);
+    const newPayable = Math.ceil(newRawTotal);
+    
+    const difference = newPayable - targetTotal;
+    discountApplied = difference > 0 ? toFixed2(difference / gstDivisor) : 0;
+  }
 
   return {
-    updatedItems: items.map((item) => ({ id: item.id, ratePerGram: adjustedRate })),
-    discountApplied: discountBoxValue,
+    updatedItems: items.map((item) => ({ id: item.id, ratePerGram: finalRate })),
+    discountApplied,
   };
 }

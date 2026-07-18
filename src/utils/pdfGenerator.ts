@@ -5,14 +5,21 @@ function numberToWords(num: number): string {
   if (num === 0) return 'Zero Only';
   const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
   const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-  const n = ('000000000' + Math.floor(num)).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+  const numStr = Math.floor(num).toString();
+  if (numStr.length > 11) return 'Amount too large';
+  const nStr = ('00000000000' + numStr).slice(-11);
+  const n = nStr.match(/^(\d{2})(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
   if (!n) return '';
   let str = '';
-  str += (Number(n[1]) !== 0) ? (a[Number(n[1])] || b[Number(n[1][0])] + ' ' + a[Number(n[1][1])]) + 'Crore ' : '';
-  str += (Number(n[2]) !== 0) ? (a[Number(n[2])] || b[Number(n[2][0])] + ' ' + a[Number(n[2][1])]) + 'Lakh ' : '';
-  str += (Number(n[3]) !== 0) ? (a[Number(n[3])] || b[Number(n[3][0])] + ' ' + a[Number(n[3][1])]) + 'Thousand ' : '';
-  str += (Number(n[4]) !== 0) ? (a[Number(n[4])] || b[Number(n[4][0])] + ' ' + a[Number(n[4][1])]) + 'Hundred ' : '';
-  str += (Number(n[5]) !== 0) ? ((str !== '') ? 'and ' : '') + (a[Number(n[5])] || b[Number(n[5][0])] + ' ' + a[Number(n[5][1])]) : '';
+  str += (Number(n[1]) !== 0) ? (a[Number(n[1])] || b[Number(n[1][0])] + ' ' + a[Number(n[1][1])]) + 'Hundred ' : '';
+  if (Number(n[1]) !== 0 || Number(n[2]) !== 0) {
+    const crorePart = a[Number(n[2])] || b[Number(n[2][0])] + ' ' + a[Number(n[2][1])];
+    str += crorePart + 'Crore ';
+  }
+  str += (Number(n[3]) !== 0) ? (a[Number(n[3])] || b[Number(n[3][0])] + ' ' + a[Number(n[3][1])]) + 'Lakh ' : '';
+  str += (Number(n[4]) !== 0) ? (a[Number(n[4])] || b[Number(n[4][0])] + ' ' + a[Number(n[4][1])]) + 'Thousand ' : '';
+  str += (Number(n[5]) !== 0) ? (a[Number(n[5])] || b[Number(n[5][0])] + ' ' + a[Number(n[5][1])]) + 'Hundred ' : '';
+  str += (Number(n[6]) !== 0) ? ((str !== '') ? 'and ' : '') + (a[Number(n[6])] || b[Number(n[6][0])] + ' ' + a[Number(n[6][1])]) : '';
   return 'Rupees ' + str.trim() + ' Only';
 }
 
@@ -88,7 +95,7 @@ export async function generateAndDownloadPDF(invoice: Invoice, profile: Business
     if (templateId === 1) {
       await renderTemplate1(page, width, height, invoice, profile, copyLabel, helveticaFont, helveticaBold, helveticaOblique, helveticaBoldOblique, logoImage, invoiceDateStr);
     } else {
-      await renderTemplate2(page, width, height, invoice, profile, copyLabel, helveticaFont, helveticaBold, helveticaOblique, helveticaBoldOblique, null, invoiceDateStr, financialYear);
+      await renderTemplate2(page, width, height, invoice, profile, copyLabel, helveticaFont, helveticaBold, helveticaOblique, helveticaBoldOblique, logoImage, invoiceDateStr, financialYear);
     }
   }
 
@@ -154,10 +161,14 @@ async function renderTemplate1(
   page.drawText(`PAN NO: ${profile.pan}`, { x: x(41.8), y: y(34.8), size: 9, font: bold, color: colors.text });
   page.drawText(`DATE: ${invoiceDateStr}`, { x: x(120), y: y(34.8), size: 9, font: bold, color: colors.text });
 
-  // Logo (if any) placed centrally around y=50
+  // Logo (if any) placed centrally above the brand name
   if (logoImage) {
-     const dims = logoImage.scaleToFit(mm(30), mm(30));
-     page.drawImage(logoImage, { x: (width - dims.width) / 2, y: y(50) + mm(15), width: dims.width, height: dims.height });
+     const maxW = mm(50);
+     const maxH = mm(13.5);
+     const ratio = Math.min(maxW / logoImage.width, maxH / logoImage.height);
+     const dims = { width: logoImage.width * ratio, height: logoImage.height * ratio };
+     // Position bottom of logo at y(49.5) so it doesn't touch the brand name at y(50.7)
+     page.drawImage(logoImage, { x: (width - dims.width) / 2, y: y(49.5), width: dims.width, height: dims.height });
   }
 
   const brandName = invoice.isSwappedAddress ? invoice.customerDetails.partyName.toUpperCase() : profile.brandName.toUpperCase();
@@ -167,7 +178,7 @@ async function renderTemplate1(
   const profileZip = profile.zipCode ? ` - ${profile.zipCode}` : '';
   const custZip = invoice.customerDetails.zipCode ? ` - ${invoice.customerDetails.zipCode}` : '';
   const addressText = invoice.isSwappedAddress 
-    ? `${invoice.customerDetails.address}, ${invoice.customerDetails.city}${custZip}` 
+    ? `${invoice.customerDetails.address || ''}, ${invoice.customerDetails.city || ''}${custZip}` 
     : `${profile.address}, ${profile.city}${profileZip}`;
   const addressW = oblique.widthOfTextAtSize(addressText, 9.5);
   page.drawText(addressText, { x: (width - addressW) / 2, y: y(57.2), size: 9.5, font: oblique, color: colors.text });
@@ -222,37 +233,33 @@ async function renderTemplate1(
   drawR(`STATE: ${rState}`, 90.6);
   drawR(`STATE CODE: ${rStateCode}`, 95.5);
 
+  const showPurityColumn = invoice.items.length > 0 && invoice.items.every((item: any) => item.purityValue && item.purityValue !== 'None');
+
   // Responsive Table columns
-  const showPurity = invoice.items.some(item => item.purityValue !== 'None');
-  let cols = [];
-  if (showPurity) {
-    cols = [
-      { label: 'Serial\nNo', x: 27.0, w: 15 },
-      { label: 'Description of Goods', x: 42.0, w: 60 },
-      { label: 'HSN/SAC\nCode', x: 102.0, w: 18, center: true },
-      { label: 'Purity', x: 120.0, w: 15, center: true },
-      { label: 'Weight\n(Gm)', x: 135.0, w: 15, center: true },
-      { label: 'Rate/Gram\n(Rs)', x: 150.0, w: 15, center: true },
-      { label: 'Amount (Rs)', x: 165.0, w: 18, center: true },
-    ];
+  const cols: any[] = [
+    { label: 'Serial\nNo', x: 27.0, w: 15 },
+  ];
+  if (showPurityColumn) {
+    cols.push(
+      { label: 'Description of Goods', x: 42.0, w: 55 },
+      { label: 'Purity', x: 97.0, w: 15, center: true }
+    );
   } else {
-    // Distribute the 15mm from Purity mainly to Description (10mm) and rest to others
-    cols = [
-      { label: 'Serial\nNo', x: 27.0, w: 15 },
-      { label: 'Description of Goods', x: 42.0, w: 70 },
-      { label: 'HSN/SAC\nCode', x: 112.0, w: 20, center: true },
-      { label: 'Weight\n(Gm)', x: 132.0, w: 16, center: true },
-      { label: 'Rate/Gram\n(Rs)', x: 148.0, w: 17, center: true },
-      { label: 'Amount (Rs)', x: 165.0, w: 18, center: true },
-    ];
+    cols.push({ label: 'Description of Goods', x: 42.0, w: 70 });
   }
+  cols.push(
+    { label: 'HSN/SAC\nCode', x: 112.0, w: 20, center: true },
+    { label: 'Weight\n(Gm)', x: 132.0, w: 16, center: true },
+    { label: 'Rate/Gram\n(Rs)', x: 148.0, w: 17, center: true },
+    { label: 'Amount (Rs)', x: 165.0, w: 18, center: true }
+  );
 
   // Draw Header Labels
   cols.forEach((c) => {
     const parts = c.label.split('\n');
     let textY = 105.9;
     if (parts.length === 1) textY = 107.5;
-    parts.forEach(p => {
+    parts.forEach((p: string) => {
        const tw = bold.widthOfTextAtSize(p, 9);
        const tx = c.center ? x(c.x) + (mm(c.w) - tw)/2 : x(c.x) + mm(2);
        page.drawText(p, { x: tx, y: y(textY), size: 9, font: bold, color: colors.text });
@@ -273,20 +280,33 @@ async function renderTemplate1(
   // Items
   let curY = 120.3;
   invoice.items.forEach((item, idx) => {
-    const pStr = item.purityValue !== 'None' ? (item.purityType === 'Karat' ? (item.purityValue.endsWith('K') ? item.purityValue : `${item.purityValue}K`) : `${item.purityValue}%`) : '';
-    const desc = `${item.itemName.toUpperCase()} ${pStr}`.trim();
+    const genName = item.itemName.toUpperCase();
+    // @ts-ignore
+    const subName = item.itemSubName ? item.itemSubName.toUpperCase() : '';
+    const namePart = subName ? `${genName} - ${subName}` : genName;
+    let desc = namePart;
+
+    if (!showPurityColumn && item.purityValue && item.purityValue !== 'None') {
+      if (item.purityType === 'Karat') {
+        const purStr = item.purityValue.endsWith('K') ? item.purityValue : `${item.purityValue}K`;
+        desc = `${purStr} ${namePart}`;
+      } else {
+        desc = `${namePart} ${item.purityValue}%`;
+      }
+    }
     
     let cIdx = 0;
     // Sr No
     page.drawText((idx+1).toString(), { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize((idx+1).toString(), 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
     // Description
     page.drawText(desc, { x: x(cols[cIdx].x) + mm(2), y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
+    // Purity
+    if (showPurityColumn) {
+      const pur = item.purityType === 'Karat' ? (item.purityValue.endsWith('K') ? item.purityValue : `${item.purityValue}K`) : `${item.purityValue}%`;
+      page.drawText(pur, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(pur, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
+    }
     // HSN
     page.drawText(item.hsn, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(item.hsn, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
-    // Purity (optional)
-    if (showPurity) {
-      page.drawText(pStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(pStr, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
-    }
     // Weight
     const wStr = item.weight.toString();
     page.drawText(wStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - bold.widthOfTextAtSize(wStr, 9))/2, y: y(curY), size: 9, font: bold, color: colors.text }); cIdx++;
@@ -320,7 +340,9 @@ async function renderTemplate1(
   drawTotRow('TOTAL AMOUNT :', totalTaxable.toFixed(2), colors.totalAmount, ty, 5.7); ty += 5.7;
   drawTotRow(`CGST ${invoice.taxDetails.cgstPercent}% :`, invoice.taxDetails.cgst.toFixed(2), colors.cgstSgst, ty, 5.7); ty += 5.7;
   drawTotRow(`SGST ${invoice.taxDetails.sgstPercent}% :`, invoice.taxDetails.sgst.toFixed(2), colors.cgstSgst, ty, 5.7); ty += 5.7;
-  drawTotRow(`IGST ${invoice.taxDetails.igstPercent}% :`, invoice.taxDetails.igst.toFixed(2), colors.igst, ty, 5.7); ty += 5.7;
+  if (invoice.taxDetails.igst > 0) {
+    drawTotRow(`IGST ${invoice.taxDetails.igstPercent}% :`, invoice.taxDetails.igst.toFixed(2), colors.igst, ty, 5.7); ty += 5.7;
+  }
   
   const roundOff = invoice.payableAmount - invoice.grandTotal;
   drawTotRow('ROUND OFF :', roundOff.toFixed(2), colors.roundOff, ty, 5.7); ty += 5.7;
@@ -333,8 +355,18 @@ async function renderTemplate1(
   ty += 8.5;
 
   // Amount in Words
-  page.drawRectangle({ x: x(27.0), y: y(216.7), width: mm(156.0), height: mm(5.4), color: colors.roundOff, borderColor: rgb(0,0,0), borderWidth: 1 });
-  page.drawText(`Amount in Words: ${numberToWords(invoice.payableAmount)}`, { x: x(40.9), y: y(211.3 + 3.8), size: 8, font: boldOblique, color: colors.text });
+  page.drawRectangle({ x: x(27.0), y: y(216.7), width: mm(156.0), height: mm(8.0), color: colors.roundOff, borderColor: rgb(0,0,0), borderWidth: 1 });
+  const wordStr = `Amount in Words: ${numberToWords(invoice.payableAmount)}`;
+  if (boldOblique.widthOfTextAtSize(wordStr, 8) > mm(140)) {
+    const mid = Math.floor(wordStr.length / 2);
+    const splitIdx = wordStr.indexOf(' ', mid);
+    const line1 = wordStr.substring(0, splitIdx);
+    const line2 = wordStr.substring(splitIdx + 1);
+    page.drawText(line1, { x: x(30.0), y: y(211.3 + 4.2), size: 8, font: boldOblique, color: colors.text });
+    page.drawText(line2, { x: x(30.0), y: y(211.3 + 1.2), size: 8, font: boldOblique, color: colors.text });
+  } else {
+    page.drawText(wordStr, { x: x(30.0), y: y(211.3 + 3.8), size: 8, font: boldOblique, color: colors.text });
+  }
 
   // Bank details
   page.drawText('PAYMENT MODE', { x: x(52.2), y: y(223.1 + 3.4), size: 9, font: bold, color: colors.paymentText });
@@ -369,7 +401,7 @@ async function renderTemplate2(
   page: PDFPage, _width: number, height: number, 
   invoice: Invoice, profile: BusinessProfile, copyLabel: string, 
   font: PDFFont, bold: PDFFont, oblique: PDFFont, _boldOblique: PDFFont, 
-  _bgImage: PDFImage | null, invoiceDateStr: string, financialYear: string
+  logoImage: PDFImage | null, invoiceDateStr: string, financialYear: string
 ) {
   const y = (valMm: number) => height - mm(valMm);
   const x = (valMm: number) => mm(valMm);
@@ -381,20 +413,16 @@ async function renderTemplate2(
 
   // Logo Circle or Image
   let logoDrawn = false;
-  if (profile.logoData) {
+  if (logoImage) {
     try {
-      const base64Data = profile.logoData.split(',')[1];
-      const logoBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-      let logoImg;
-      if (profile.logoData.startsWith('data:image/png')) {
-        logoImg = await page.doc.embedPng(logoBytes);
-      } else {
-        logoImg = await page.doc.embedJpg(logoBytes);
-      }
-      page.drawImage(logoImg, { x: x(12), y: y(30), width: mm(18), height: mm(18) });
+      const maxW = 55;
+      const maxH = 55;
+      const ratio = Math.min(maxW / logoImage.width, maxH / logoImage.height);
+      const dims = { width: logoImage.width * ratio, height: logoImage.height * ratio };
+      page.drawImage(logoImage, { x: x(21) - dims.width / 2, y: y(21) - dims.height / 2, width: dims.width, height: dims.height });
       logoDrawn = true;
     } catch (e) {
-      console.error('Could not embed logo in Template 2', e);
+      console.error('Could not draw logo in Template 2', e);
     }
   }
 
@@ -489,9 +517,9 @@ async function renderTemplate2(
     bR += 5.5;
   };
 
-  if (invoice.isShippingDifferent) {
-    drawBL('NAME:', rName);
-    drawBL('ADDRESS:', `${rAddress}, ${rCity}`);
+  if (invoice.customerDetails.shippingAddress && invoice.customerDetails.shippingAddress.trim() !== '') {
+    drawBL('NAME:', rName || 'NILL');
+    drawBL('ADDRESS:', `${rAddress || ''}, ${rCity || ''}`.replace(/^, | , $/g, '') || 'NILL');
     drawBL('CONTACT NO:', rPhone || 'NILL');
     drawBL('GSTIN:', rGstin || 'NILL');
     drawBL(`${rIdType}:`, rPan || 'NILL');
@@ -499,17 +527,17 @@ async function renderTemplate2(
     const sCityRaw = invoice.customerDetails.shippingCity ? invoice.customerDetails.shippingCity : '';
     const sZip = invoice.customerDetails.shippingZipCode ? ` - ${invoice.customerDetails.shippingZipCode}` : '';
     const sCity = sZip ? `${sCityRaw}${sZip}` : sCityRaw;
-    drawBR('ADDRESS:', `${invoice.customerDetails.shippingAddress}, ${sCity}`);
+    drawBR('ADDRESS:', `${invoice.customerDetails.shippingAddress || ''}, ${sCity}`.replace(/^, | , $/g, '') || 'NILL');
     drawBR('STATE:', invoice.customerDetails.shippingStateName || 'NILL');
     drawBR('STATE CODE:', invoice.customerDetails.shippingStateCode || 'NILL');
     drawBR('POS:', rPos || 'NILL');
   } else {
-    drawBL('NAME:', rName);
+    drawBL('NAME:', rName || 'NILL');
     drawBL('CONTACT NO:', rPhone || 'NILL');
     drawBL('GSTIN:', rGstin || 'NILL');
     drawBL(`${rIdType}:`, rPan || 'NILL');
 
-    drawBR('ADDRESS:', `${rAddress}, ${rCity}`);
+    drawBR('ADDRESS:', `${rAddress || ''}, ${rCity || ''}`.replace(/^, | , $/g, '') || 'NILL');
     drawBR('STATE:', rState || 'NILL');
     drawBR('STATE CODE:', rStateCode || 'NILL');
     drawBR('POS:', rPos || 'NILL');
@@ -518,40 +546,36 @@ async function renderTemplate2(
   // Table header bar
   page.drawRectangle({ x: x(12), y: y(95), width: mm(186), height: mm(7), color: darkBlue });
 
-  const showPurity = invoice.items.some(item => item.purityValue !== 'None');
-  let cols = [];
-  if (showPurity) {
-    cols = [
-      { label: 'SR.\nNO.', x: 12, w: 10, center: true },
+  const showPurityColumn = invoice.items.length > 0 && invoice.items.every((item: any) => item.purityValue && item.purityValue !== 'None');
+
+  const cols: any[] = [
+    { label: 'SR.\nNO.', x: 12, w: 10, center: true },
+  ];
+  if (showPurityColumn) {
+    cols.push(
       { label: 'DESCRIPTION OF GOODS', x: 22, w: 66 },
-      { label: 'HSN/SAC\nCODE', x: 88, w: 18, center: true },
-      { label: 'PURITY\n(%)', x: 106, w: 15, center: true },
-      { label: 'WEIGHT', x: 121, w: 18, center: true },
-      { label: 'UNIT', x: 139, w: 10, center: true },
-      { label: 'RATE (Rs)', x: 149, w: 21, center: true },
-      { label: 'AMOUNT (Rs)', x: 170, w: 28, center: true },
-    ];
+      { label: 'PURITY', x: 88, w: 15, center: true }
+    );
   } else {
-    cols = [
-      { label: 'SR.\nNO.', x: 12, w: 10, center: true },
-      { label: 'DESCRIPTION OF GOODS', x: 22, w: 81 },
-      { label: 'HSN/SAC\nCODE', x: 103, w: 18, center: true },
-      { label: 'WEIGHT', x: 121, w: 18, center: true },
-      { label: 'UNIT', x: 139, w: 10, center: true },
-      { label: 'RATE (Rs)', x: 149, w: 21, center: true },
-      { label: 'AMOUNT (Rs)', x: 170, w: 28, center: true },
-    ];
+    cols.push({ label: 'DESCRIPTION OF GOODS', x: 22, w: 81 });
   }
+  cols.push(
+    { label: 'HSN/SAC\nCODE', x: 103, w: 18, center: true },
+    { label: 'WEIGHT', x: 121, w: 18, center: true },
+    { label: 'UNIT', x: 139, w: 10, center: true },
+    { label: 'RATE (Rs)', x: 149, w: 21, center: true },
+    { label: 'AMOUNT (Rs)', x: 170, w: 28, center: true }
+  );
 
   // Draw Header text
   cols.forEach(c => {
     const parts = c.label.split('\n');
     let textY = 90.2;
     if (parts.length === 1) textY = 92.2;
-    parts.forEach(p => {
-      const tw = bold.widthOfTextAtSize(p, 7.5);
+    parts.forEach((p: string) => {
+      const tw = bold.widthOfTextAtSize(p || '', 7.5);
       const tx = c.center ? x(c.x) + (mm(c.w) - tw)/2 : x(c.x) + mm(2);
-      page.drawText(p, { x: tx, y: y(textY), size: 7.5, font: bold, color: gold });
+      page.drawText(p || '', { x: tx, y: y(textY), size: 7.5, font: bold, color: gold });
       textY += 3.5;
     });
   });
@@ -565,8 +589,20 @@ async function renderTemplate2(
   // Draw Item Rows
   let curY = 100.5;
   invoice.items.forEach((item, idx) => {
-    const pStr = item.purityValue !== 'None' ? (item.purityType === 'Karat' ? (item.purityValue.endsWith('K') ? item.purityValue : `${item.purityValue}K`) : `${item.purityValue}%`) : '';
-    const desc = item.itemName.toUpperCase();
+    const genName = (item.itemName || '').toUpperCase();
+    // @ts-ignore
+    const subName = item.itemSubName ? item.itemSubName.toUpperCase() : '';
+    const namePart = subName ? `${genName} - ${subName}` : genName;
+    let desc = namePart;
+
+    if (!showPurityColumn && item.purityValue && item.purityValue !== 'None') {
+      if (item.purityType === 'Karat') {
+        const purStr = item.purityValue.endsWith('K') ? item.purityValue : `${item.purityValue}K`;
+        desc = `${purStr} ${namePart}`;
+      } else {
+        desc = `${namePart} ${item.purityValue}%`;
+      }
+    }
 
     let cIdx = 0;
     // Sr No
@@ -574,12 +610,13 @@ async function renderTemplate2(
     page.drawText(srStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - font.widthOfTextAtSize(srStr, 8.5))/2, y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
     // Description
     page.drawText(desc, { x: x(cols[cIdx].x) + mm(2), y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    // Purity
+    if (showPurityColumn) {
+      const pur = item.purityType === 'Karat' ? (item.purityValue.endsWith('K') ? item.purityValue : `${item.purityValue}K`) : `${item.purityValue}%`;
+      page.drawText(pur, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - font.widthOfTextAtSize(pur, 8.5))/2, y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
+    }
     // HSN
     page.drawText(item.hsn, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - font.widthOfTextAtSize(item.hsn, 8.5))/2, y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
-    // Purity
-    if (showPurity) {
-      page.drawText(pStr, { x: x(cols[cIdx].x) + (mm(cols[cIdx].w) - font.widthOfTextAtSize(pStr, 8.5))/2, y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;
-    }
     // Weight
     const wStr = item.weight.toFixed(2);
     page.drawText(wStr, { x: x(cols[cIdx].x) + mm(cols[cIdx].w) - mm(2) - font.widthOfTextAtSize(wStr, 8.5), y: y(curY), size: 8.5, font: font, color: textDark }); cIdx++;

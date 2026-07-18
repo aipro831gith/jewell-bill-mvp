@@ -128,10 +128,10 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   
   // Calculations, discounts, and payment
   const [discountApplied, setDiscountApplied] = useState(0);
+  const [discountInput, setDiscountInput] = useState<string>('');
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Card' | 'Bank Transfer' | 'UPI' | 'RTGS' | 'None'>('None');
   const [customPayableAmount, setCustomPayableAmount] = useState<number | null>(null);
   const [targetTotalInput, setTargetTotalInput] = useState('');
-  const [showTargetInput, setShowTargetInput] = useState(false);
   
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
@@ -159,6 +159,38 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
     }
   }, [customerSearchQuery]);
 
+  const [phoneSearchQuery, setPhoneSearchQuery] = useState('');
+  const [suggestedPhones, setSuggestedPhones] = useState<Customer[]>([]);
+  const [showPhoneSuggestions, setShowPhoneSuggestions] = useState(false);
+
+  useEffect(() => {
+    if (phoneSearchQuery.trim().length > 0) {
+      searchCustomers(phoneSearchQuery).then((res) => {
+        setSuggestedPhones(res);
+        setShowPhoneSuggestions(true);
+      });
+    } else {
+      setSuggestedPhones([]);
+      setShowPhoneSuggestions(false);
+    }
+  }, [phoneSearchQuery]);
+
+  const [addressSearchQuery, setAddressSearchQuery] = useState('');
+  const [suggestedAddresses, setSuggestedAddresses] = useState<Customer[]>([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+
+  useEffect(() => {
+    if (addressSearchQuery.trim().length > 0) {
+      searchCustomers(addressSearchQuery).then((res) => {
+        setSuggestedAddresses(res);
+        setShowAddressSuggestions(true);
+      });
+    } else {
+      setSuggestedAddresses([]);
+      setShowAddressSuggestions(false);
+    }
+  }, [addressSearchQuery]);
+
   const handleSelectCustomer = (c: Customer) => {
     setCustomerDetails({
       partyName: c.partyName,
@@ -181,6 +213,29 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
     if (c.shippingAddress) setIsShippingDifferent(true);
     setCustomerSearchQuery(c.partyName);
     setShowSuggestions(false);
+    setPhoneSearchQuery('');
+    setShowPhoneSuggestions(false);
+    setAddressSearchQuery('');
+    setShowAddressSuggestions(false);
+  };
+
+  const handleSelectPhone = (c: Customer) => {
+    setCustomerDetails(prev => ({ ...prev, phone: c.phone }));
+    setPhoneSearchQuery('');
+    setShowPhoneSuggestions(false);
+  };
+
+  const handleSelectAddress = (c: Customer) => {
+    setCustomerDetails(prev => ({
+      ...prev,
+      address: c.address,
+      city: c.city,
+      zipCode: c.zipCode || '',
+      stateName: c.stateName,
+      stateCode: c.stateCode
+    }));
+    setAddressSearchQuery('');
+    setShowAddressSuggestions(false);
   };
 
   const handleCustomerFieldChange = (field: string, value: string) => {
@@ -218,6 +273,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   const handleAddItem = () => {
     setCustomPayableAmount(null);
     setDiscountApplied(0);
+    setDiscountInput('');
     const newItem: InvoiceItem = {
       id: Math.random().toString(36).substring(2, 9),
       metal: 'GOLD',
@@ -237,12 +293,24 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
   const handleRemoveItem = (id: string) => {
     setCustomPayableAmount(null);
     setDiscountApplied(0);
+    setDiscountInput('');
     setItems(prev => prev.filter(item => item.id !== id));
   };
 
   const handleItemFieldChange = (id: string, field: keyof InvoiceItem, value: any) => {
-    setCustomPayableAmount(null);
-    setDiscountApplied(0);
+    if (customPayableAmount !== null) {
+      alert("Target Override has been reset because item details were modified. Please re-apply the override if needed.");
+      setCustomPayableAmount(null);
+      setDiscountApplied(0);
+      setDiscountInput('');
+      setTargetTotalInput('');
+    } else {
+      setCustomPayableAmount(null);
+      // Wait, we should not clear the discount when item fields change, only when override resets.
+      // Or maybe we do clear it? Original code had `setDiscountApplied(0);`
+      setDiscountApplied(0);
+      setDiscountInput('');
+    }
     setItems(prev => prev.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
@@ -341,18 +409,56 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
     if (targetTotalInput.trim() === '') {
       setCustomPayableAmount(null);
       setDiscountApplied(0);
+      setDiscountInput('');
       return;
     }
     const target = Number(targetTotalInput);
+    if (target <= 0) {
+      alert('Target override must be greater than zero.');
+      return;
+    }
+    
+    let itemsForReverse = items;
+    const totalWeight = items.reduce((sum, item) => sum + item.weightInGrams, 0);
+    if (totalWeight <= 0) {
+      const firstItemWithRate = items.find(item => item.ratePerGram > 0);
+      if (firstItemWithRate) {
+        const cgstPercent = isLocalSupply ? 1.5 : 0;
+        const sgstPercent = isLocalSupply ? 1.5 : 0;
+        const igstPercent = isLocalSupply ? 0 : 3.0;
+        const totalGstPercent = cgstPercent + sgstPercent + igstPercent;
+        const gstDivisor = 1 + (totalGstPercent / 100);
+        
+        const targetTaxable = target / gstDivisor;
+        const calculatedWeight = toFixed3(targetTaxable / firstItemWithRate.ratePerGram);
+        
+        itemsForReverse = items.map(item => {
+          if (item.id === firstItemWithRate.id) {
+            const weightInput = item.weightUnit === 'kg' ? calculatedWeight / 1000 : calculatedWeight;
+            return {
+              ...item,
+              weight: weightInput,
+              weightInGrams: calculatedWeight,
+              taxableAmount: toFixed2(calculatedWeight * item.ratePerGram)
+            };
+          }
+          return item;
+        });
+      } else {
+        alert('Cannot apply target override when total item weight is zero and no rate is provided.');
+        return;
+      }
+    }
+    
     setCustomPayableAmount(target);
 
     const reverseResult = applyReverseCalculation(
       target,
-      items.map(item => ({ id: item.id, weightInGrams: item.weightInGrams })),
+      itemsForReverse.map(item => ({ id: item.id, weightInGrams: item.weightInGrams })),
       isLocalSupply
     );
 
-    setItems(prev => prev.map(item => {
+    setItems(itemsForReverse.map(item => {
       const match = reverseResult.updatedItems.find(x => x.id === item.id);
       if (match) {
         const rate = match.ratePerGram;
@@ -366,6 +472,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
     }));
 
     setDiscountApplied(reverseResult.discountApplied);
+    setDiscountInput(reverseResult.discountApplied ? reverseResult.discountApplied.toString() : '');
   };
 
   // Cash Compliance locker
@@ -432,9 +539,13 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
       await saveInvoice(newInvoice);
       await generateAndDownloadPDF(newInvoice, profile);
       setIsSaved(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Error occurred while generating PDF.');
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert('Error occurred while generating PDF.');
+      }
     } finally {
       setGeneratingPDF(false);
     }
@@ -631,15 +742,36 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                     <option value="+44">+44 (UK)</option>
                   </select>
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-2 relative">
                   <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Phone Number</label>
                   <input
                     type="text"
                     placeholder="Optional"
                     value={customerDetails.phone}
-                    onChange={(e) => handleCustomerFieldChange('phone', e.target.value)}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/[^0-9+\-()\s]/g, '');
+                      handleCustomerFieldChange('phone', clean);
+                      setPhoneSearchQuery(clean);
+                    }}
                     className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
                   />
+                  {showPhoneSuggestions && suggestedPhones.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-1 bg-zinc-950 border border-zinc-850 rounded-lg shadow-2xl z-50 divide-y divide-zinc-900 max-h-40 overflow-y-auto">
+                      {suggestedPhones.map((cust) => (
+                        <button
+                          key={`phone-${cust.id}`}
+                          onClick={() => handleSelectPhone(cust)}
+                          className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900 transition flex justify-between items-center"
+                        >
+                          <div>
+                            <span className="font-bold text-white">{cust.phone}</span>
+                            <span className="text-zinc-500 ml-2">({cust.partyName})</span>
+                          </div>
+                          <span className="text-[9px] text-indigo-400 uppercase">Select</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -647,19 +779,22 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div>
                 <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">State Name *</label>
-                <select
+                <input
+                  type="text"
+                  list="states-list"
+                  placeholder="e.g. Maharashtra"
                   required
                   value={customerDetails.stateName}
                   onChange={(e) => handleCustomerFieldChange('stateName', e.target.value)}
                   className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select State</option>
+                />
+                <datalist id="states-list">
                   {INDIAN_STATES.map((st) => (
                     <option key={st.name} value={st.name}>
                       {st.name} ({st.code})
                     </option>
                   ))}
-                </select>
+                </datalist>
               </div>
               <div>
                 <label className="flex items-center space-x-2 mt-5">
@@ -673,6 +808,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                         handleCustomerFieldChange('shippingCity', '');
                         handleCustomerFieldChange('shippingStateName', '');
                         handleCustomerFieldChange('shippingStateCode', '');
+                        handleCustomerFieldChange('shippingZipCode', '');
                       }
                     }}
                     className="rounded border-zinc-850 bg-zinc-950/60 text-indigo-600 focus:ring-indigo-500"
@@ -683,15 +819,35 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 relative">
                 <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Address</label>
                 <input
                   type="text"
                   placeholder="Street details"
                   value={customerDetails.address}
-                  onChange={(e) => handleCustomerFieldChange('address', e.target.value)}
+                  onChange={(e) => {
+                    handleCustomerFieldChange('address', e.target.value);
+                    setAddressSearchQuery(e.target.value);
+                  }}
                   className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
                 />
+                {showAddressSuggestions && suggestedAddresses.length > 0 && (
+                  <div className="absolute left-0 right-0 mt-1 bg-zinc-950 border border-zinc-850 rounded-lg shadow-2xl z-50 divide-y divide-zinc-900 max-h-40 overflow-y-auto">
+                    {suggestedAddresses.map((cust) => (
+                      <button
+                        key={`addr-${cust.id}`}
+                        onClick={() => handleSelectAddress(cust)}
+                        className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900 transition flex justify-between items-center"
+                      >
+                        <div>
+                          <span className="font-bold text-white">{cust.address}</span>
+                          <span className="text-zinc-500 ml-2">({cust.partyName})</span>
+                        </div>
+                        <span className="text-[9px] text-indigo-400 uppercase">Select</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">City</label>
@@ -722,7 +878,10 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                   type="text"
                   placeholder="e.g. 700001"
                   value={customerDetails.zipCode || ''}
-                  onChange={(e) => handleCustomerFieldChange('zipCode', e.target.value)}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
+                    handleCustomerFieldChange('zipCode', clean);
+                  }}
                   className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -779,19 +938,16 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Shipping State</label>
-                  <select
+                  <input
+                    type="text"
+                    list="states-list"
+                    placeholder="e.g. Maharashtra"
                     value={customerDetails.shippingStateName}
                     onChange={(e) => handleCustomerFieldChange('shippingStateName', e.target.value)}
                     className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="">Select State</option>
-                    {INDIAN_STATES.map((st) => (
-                      <option key={st.name} value={st.name}>
-                        {st.name} ({st.code})
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
+                <div></div>
               </div>
             </div>
             )}
@@ -841,7 +997,13 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                   type="text"
                   placeholder={customerDetails.idType === 'PAN' ? 'ABCDE1234F' : '123456789012'}
                   value={customerDetails.panAadhaar}
-                  onChange={(e) => handleCustomerFieldChange('panAadhaar', e.target.value)}
+                  onChange={(e) => {
+                    let clean = e.target.value.toUpperCase();
+                    if (customerDetails.idType === 'AADHAAR') {
+                      clean = clean.replace(/[^0-9]/g, '').slice(0, 12);
+                    }
+                    handleCustomerFieldChange('panAadhaar', clean);
+                  }}
                   readOnly={customerDetails.gstin.length >= 15 && customerDetails.idType === 'PAN'}
                   className={`w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 ${customerDetails.gstin.length >= 15 && customerDetails.idType === 'PAN' ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
@@ -906,7 +1068,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                             <option value="SILVER">SILVER</option>
                           </select>
                         </td>
-                        <td className="py-2.5 pr-2">
+                        <td className="py-2.5 pr-2 flex flex-col space-y-1">
                           <select
                             value={item.itemName}
                             onChange={(e) => handleItemFieldChange(item.id, 'itemName', e.target.value)}
@@ -933,6 +1095,13 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                               </>
                             )}
                           </select>
+                          <input
+                            type="text"
+                            placeholder="Optional Name"
+                            value={item.itemSubName || ''}
+                            onChange={(e) => handleItemFieldChange(item.id, 'itemSubName', e.target.value)}
+                            className="bg-zinc-950/60 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500 w-36"
+                          />
                         </td>
                         <td className="py-2.5 pr-2">
                           <input
@@ -995,7 +1164,11 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                             placeholder="0.0"
                             value={item.weight || ''}
                             onChange={(e) => {
-                              const clean = e.target.value.replace(/[^0-9.]/g, '');
+                              let clean = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+                              const parts = clean.split('.');
+                              if (parts.length > 1) {
+                                clean = `${parts[0]}.${parts[1].substring(0, 2)}`;
+                              }
                               handleItemFieldChange(item.id, 'weight', clean);
                             }}
                             className="bg-zinc-950 border border-zinc-850 rounded px-1.5 py-1 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500 w-14"
@@ -1018,7 +1191,11 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                             placeholder="0.00"
                             value={item.ratePerGram || ''}
                             onChange={(e) => {
-                              const clean = e.target.value.replace(/[^0-9.]/g, '');
+                              let clean = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+                              const parts = clean.split('.');
+                              if (parts.length > 1) {
+                                clean = `${parts[0]}.${parts[1].substring(0, 2)}`;
+                              }
                               handleItemFieldChange(item.id, 'ratePerGram', clean);
                             }}
                             onBlur={() => {
@@ -1071,12 +1248,29 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                 <span className="text-zinc-200 font-medium">₹{forwardCalculations.totalTaxableBeforeDiscount.toFixed(2)}</span>
               </div>
               
-              {discountApplied > 0 && (
-                <div className="flex justify-between text-red-400">
-                  <span>Discount Applied (Less):</span>
-                  <span>-₹{discountApplied.toFixed(2)}</span>
+              <div className="flex justify-between items-center text-red-400">
+                <span>Discount (Less):</span>
+                <div className="flex items-center space-x-1">
+                  <span>-₹</span>
+                  <input
+                    type="text"
+                    value={discountInput}
+                    onChange={(e) => {
+                      let clean = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+                      const parts = clean.split('.');
+                      if (parts.length > 1) {
+                        clean = `${parts[0]}.${parts[1].substring(0, 2)}`;
+                      }
+                      setDiscountInput(clean);
+                      setDiscountApplied(clean ? Number(clean) : 0);
+                      setCustomPayableAmount(null);
+                      setTargetTotalInput('');
+                    }}
+                    placeholder="0.00"
+                    className="w-20 bg-zinc-950/60 border border-zinc-850 rounded px-1.5 py-1 text-xs text-red-400 text-right focus:outline-none focus:border-red-500"
+                  />
                 </div>
-              )}
+              </div>
 
               {isLocalSupply ? (
                 <>
@@ -1101,6 +1295,11 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
                 <span>₹{finalGrandTotal.toFixed(2)}</span>
               </div>
 
+              <div className="flex justify-between text-zinc-400">
+                <span>Round Off:</span>
+                <span>{forwardCalculations.payableAmount - finalGrandTotal >= 0 ? '+' : '-'}₹{Math.abs(forwardCalculations.payableAmount - finalGrandTotal).toFixed(2)}</span>
+              </div>
+
               <div className="flex justify-between pt-2 text-sm font-bold text-white">
                 <span>Standard Payable:</span>
                 <span className="text-indigo-400 font-outfit">₹{forwardCalculations.payableAmount.toLocaleString('en-IN')}</span>
@@ -1111,55 +1310,25 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({
             <div className="mt-4 pt-4 border-t border-zinc-850">
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Target Total Negotiated Override</label>
-                {!showTargetInput && (
-                  <button onClick={() => setShowTargetInput(true)} className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">
-                    + ADD OVERRIDE
-                  </button>
-                )}
               </div>
-              {showTargetInput && (
-                <div 
-                  className="flex space-x-2"
-                  onBlur={(e) => {
-                    // Hide when focus leaves the input and apply button
-                    if (!e.currentTarget.contains(e.relatedTarget)) {
-                      if (!customPayableAmount) {
-                        setShowTargetInput(false);
-                        setTargetTotalInput('');
-                      }
-                    }
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  placeholder="e.g. 59600"
+                  value={targetTotalInput}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/[^0-9]/g, '');
+                    setTargetTotalInput(clean);
                   }}
+                  className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-indigo-400 font-bold focus:outline-none focus:border-indigo-500 placeholder-zinc-700"
+                />
+                <button
+                  onClick={handlePayableAmountOverride}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center font-bold text-sm"
                 >
-                  <input
-                    type="text"
-                    autoFocus
-                    placeholder="e.g. 59600"
-                    value={targetTotalInput}
-                    onChange={(e) => {
-                      const clean = e.target.value.replace(/[^0-9]/g, '');
-                      setTargetTotalInput(clean);
-                    }}
-                    className="w-full bg-zinc-950/60 border border-zinc-850 rounded-lg px-3 py-2 text-xs text-indigo-400 font-bold focus:outline-none focus:border-indigo-500 placeholder-zinc-700"
-                  />
-                  <button
-                    onClick={handlePayableAmountOverride}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center font-bold text-sm"
-                  >
-                    Apply
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowTargetInput(false);
-                      setTargetTotalInput('');
-                      setCustomPayableAmount(null);
-                      setDiscountApplied(0);
-                    }}
-                    className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-3 py-2 rounded-lg transition-colors flex items-center justify-center font-bold text-sm"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
+                  Apply
+                </button>
+              </div>
             </div>
           </div>
 

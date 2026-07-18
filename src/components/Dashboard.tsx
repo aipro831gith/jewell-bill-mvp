@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { deleteInvoice } from '../db/database';
 import type { Invoice, BusinessProfile } from '../db/database';
 import { Plus, Download, Search, FileText, IndianRupee, CreditCard, ShoppingBag, Landmark, Settings, Sparkles, Trash2, LogOut, UserPlus } from 'lucide-react';
 import { generateAndDownloadPDF } from '../utils/pdfGenerator';
@@ -14,6 +15,7 @@ interface DashboardProps {
   onDeleteProfile: (id: number) => void;
   onLogOut: () => void;
   onProfileSwitched?: () => void;
+  onInvoiceDeleted?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -26,6 +28,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onSwitchProfile,
   onDeleteProfile,
   onLogOut,
+  onInvoiceDeleted,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'TAX_INVOICE' | 'DELIVERY_CHALLAN'>('ALL');
@@ -109,6 +112,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
       console.error('Failed to download PDF', err);
     } finally {
       setDownloadingId(null);
+    }
+  };
+
+  const handleDeleteInvoice = async (inv: Invoice) => {
+    if (confirm(`Are you sure you want to delete invoice ${inv.invoiceId}?`)) {
+      try {
+        await deleteInvoice(inv.invoiceId);
+        if (onInvoiceDeleted) onInvoiceDeleted();
+      } catch (err) {
+        console.error('Failed to delete invoice', err);
+        alert('Failed to delete invoice');
+      }
     }
   };
 
@@ -423,6 +438,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           >
                             <Download className="h-4 w-4" />
                             <span className="text-xs font-semibold px-1">PDF</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteInvoice(inv)}
+                            className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white p-2 rounded-lg transition border border-red-500/20 inline-flex items-center space-x-1"
+                            title="Delete Invoice"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="text-xs font-semibold px-1">Del</span>
                           </button>
                         </div>
                       </td>
