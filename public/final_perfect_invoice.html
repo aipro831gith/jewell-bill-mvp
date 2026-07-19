@@ -17,8 +17,10 @@
   .page {
     width: 210mm;
     min-height: 297mm;
+    max-height: 297mm;
+    overflow: hidden;
     margin: 0 auto;
-    background: #F7F6F3;
+    background: #FFFFFF;
     position: relative;
     padding: 0 12mm 8mm 12mm;
   }
@@ -33,7 +35,7 @@
   .header-right { text-align: right; }
 
   .logo-block { text-align: center; margin-bottom: 3mm; position: relative; }
-  .logo-block img { width: 55mm; height: auto; display: block; margin: 0 auto; background: transparent; mix-blend-mode: multiply; }
+  .logo-block img { width: 55mm; height: 45mm; object-fit: contain; display: block; margin: 0 auto; background: transparent; mix-blend-mode: multiply; }
   .company-name { color: #00A651; font-size: 21pt; font-weight: bold; margin-top: 1mm; letter-spacing: 0.3px; }
   .company-address { font-size: 10pt; font-style: italic; font-weight: bold; margin-top: 1mm; }
   .company-contact, .company-email { font-size: 10pt; font-weight: bold; }
