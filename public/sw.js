@@ -1,4 +1,4 @@
-const CACHE_NAME = 'snj-billing-v2'; // Increment version to clear old cache
+const CACHE_NAME = 'snj-billing-v3'; // Increment version to clear old cache
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -39,6 +39,7 @@ self.addEventListener('fetch', (e) => {
   // Network-First Strategy for HTML, Manifest, and Service Worker
   if (
     e.request.mode === 'navigate' ||
+    url.pathname.endsWith('.html') ||
     url.pathname.endsWith('manifest.json') ||
     url.pathname.endsWith('sw.js')
   ) {
